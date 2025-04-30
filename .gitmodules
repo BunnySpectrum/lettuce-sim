@@ -1,0 +1,3 @@
+[submodule "MSP430-Emulator"]
+	path = MSP430-Emulator
+	url = https://github.com/BunnySpectrum/MSP430-Emulator.git
