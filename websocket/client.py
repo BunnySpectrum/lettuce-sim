@@ -5,7 +5,7 @@
 import asyncio
 from websockets.asyncio.client import connect, ClientConnection
 import websockets
-import typing
+from typing import Optional
 
 inbox = []
 
@@ -55,7 +55,16 @@ async def sender(ws: ClientConnection):
             print("Sender: Closed error")
             return
 
+def to_uint16(value, msb_first=True) -> bytes:
+    if msb_first:
+        order = [8, 0]
+    else:
+        order = [0, 8]
+
+    return bytes([(value>>_)&0xff for _ in order])
+
 import code
+import os
 class Emu:
     def __init__(self, loop: asyncio.AbstractEventLoop):
         self._loop = loop
@@ -71,6 +80,17 @@ class Emu:
 
     def help(self):
         self.cmd('help\n')
+
+    def upload_elf(self, path: str, name: Optional[str] = None):
+        if name is None:
+            name = os.path.basename(path)
+        with open(path, 'rb') as elf:
+            data = elf.read()   
+            fileSize = len(data)
+            fileNameLength = len(name)
+            print(f'Name: {name}, Size: {fileSize}')
+            self.send(b'\x00' + to_uint16(fileSize) + to_uint16(fileNameLength) + bytes(name, 'utf-8'))
+            self.send(data)
 
 
 
