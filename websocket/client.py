@@ -3,9 +3,11 @@
 """Client using the asyncio API."""
 
 import asyncio
+import enum
+import os
+from typing import Optional, Union
 from websockets.asyncio.client import connect, ClientConnection
 import websockets
-from typing import Optional
 
 inbox = []
 
@@ -63,23 +65,106 @@ def to_uint16(value, msb_first=True) -> bytes:
 
     return bytes([(value>>_)&0xff for _ in order])
 
-import code
-import os
+
+# XXX move out of client.py probably
+class Register(enum.Enum):
+    PC = 'pc'
+    SP = 'sp'
+    R4 = 'r4'
+    R5 = 'r5'
+    R6 = 'r6'
+    R7 = 'r7'
+    R8 = 'r8'
+    R9 = 'r9'
+    R10 = 'r10'
+    R11 = 'r11'
+    R12 = 'r12'
+    R13 = 'r13'
+    R14 = 'r14'
+    R15 = 'r15'
+
+    @classmethod
+    def new(cls, input: Union['Register', str]) -> 'Register':
+        if isinstance(input, Register):
+            return input
+        elif isinstance(input, str):
+            return Register.from_string(input)
+        else:
+            raise ValueError(f'Invalid input: {input}')
+
+    @classmethod
+    def from_string(cls, input: str) -> 'Register':
+        norm = input.lower()
+        for e in Register:
+            if e.value == norm:
+                return e
+        
+        raise ValueError(f'Invalid register: {input}')
+
+    def to_str(self) -> str:
+        return self.value
+
+
+
 class Emu:
     def __init__(self, loop: asyncio.AbstractEventLoop):
         self._loop = loop
 
-    def send(self, msg: bytes):
+    def _send(self, msg: bytes):
         asyncio.run_coroutine_threadsafe(outbox.put(msg), self._loop).result()
 
-    def cmd(self, msg: str):
-        self.send(b'\x04' + bytes(msg, 'utf-8'))
+    def _cmd(self, msg: str):
+        self._send(b'\x04' + bytes(msg, 'utf-8'))
 
     def dump(self, addr):
-        self.cmd(f'dump {addr}\n')
+        self._cmd(f'dump {addr}\n')
 
     def help(self):
-        self.cmd('help\n')
+        self._cmd('help\n')
+    
+    def run(self):
+        #  [Run Program Until Breakpoint is Hit]
+        self._cmd('run\n')
+        # self._send(bytes([1])) # this also works
+
+    def stop(self):
+        self._send(bytes([2]))
+
+    def step(self, count: int):
+        self._cmd(f'step {count}\n')
+
+    def dump_mem(self, addr: int):
+        self._cmd(f'dump {hex(addr)}\n')
+    
+    def dump_reg(self, reg: Union[Register, str]):
+        _reg = Register.new(reg)
+        self._cmd(f'dump {_reg.to_str()}\n')
+
+    def set_mem(self, addr: int, value: int):
+        self._cmd(f'set {hex(addr)} {hex(value)}\n')
+    
+    def set_reg(self, reg: Union[Register, str], value: int):
+        _reg = Register.new(reg)
+        self._cmd(f'set {_reg.to_str()} {hex(value)}\n')
+
+    def dis(self, addr:int, count: int = 1):
+        self._cmd(f'dis {count} {hex(addr)}\n')
+    
+    def set_breakpoint(self, addr: int):
+        # XXX how to clear breakpoints?
+        self._cmd(f'break {hex(addr)}\n')
+
+    def list_breakpoints(self):
+        self._cmd('bps\n')
+
+    def list_registers(self):
+        self._cmd('regs\n')
+
+    def reset(self):
+        self._cmd('reset\n')
+    
+    def quit(self):
+        self._cmd('quit\n')
 
     def upload_elf(self, path: str, name: Optional[str] = None):
         if name is None:
@@ -89,8 +174,8 @@ class Emu:
             fileSize = len(data)
             fileNameLength = len(name)
             print(f'Name: {name}, Size: {fileSize}')
-            self.send(b'\x00' + to_uint16(fileSize) + to_uint16(fileNameLength) + bytes(name, 'utf-8'))
-            self.send(data)
+            self._send(b'\x00' + to_uint16(fileSize) + to_uint16(fileNameLength) + bytes(name, 'utf-8'))
+            self._send(data)
 
 
 
@@ -98,16 +183,6 @@ def shutdown(ws: ClientConnection, queue: asyncio.Queue):
     queue.shutdown()
     # ws.close()
 
-#  run			[Run Program Until Breakpoint is Hit]
-#  step [N]		[Step Into Instruction]
-#  dump [HEX_ADDR|Rn]	[Dump Memory direct or at register value]
-#  set [HEX_ADDR|Rn]	[Set Memory or Register Location]
-#  dis [N][HEX_ADDR]	[Disassemble Instructions]
-#  break ADDR		[Set a Breakpoint]
-#  bps			[Display Breakpoints]
-#  regs			[Display Registers]
-#  reset			[Reset Machine]
-#  quit			[Exit program]
 
 from IPython import embed
 def repl(loop: asyncio.AbstractEventLoop, ws: ClientConnection):
@@ -120,11 +195,7 @@ def repl(loop: asyncio.AbstractEventLoop, ws: ClientConnection):
     emu = Emu(loop)
     try:
         embed()
-        # code.interact(local=locals)
     except SystemExit as e:
-        # outbox.shutdown()
-        # print(f'{e=}, {e.code}, {type(e.code)}')
-        # return e.code == 1
         print("Shutting down")
         shutdown(ws, outbox)
     return False
