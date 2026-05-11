@@ -27,12 +27,20 @@ const char* const kEnRoom = "Room";
 const char* const kRuRoom = "\xd0\x97\xd0\x90\xd0\x9f\xd0\x90\xd0\xa1";
 // ЗАПАС
 
+const char* const kEnHelp = "Help";
+const char* const kRuHelp = "\xd0\xbf\xd0\xbe\xd0\xbc\xd0\xbe\xd1\x89\xd1\x8c";
+
+const char* const kEnError = "Error";
+const char* const kRuError = "\xd0\xbe\xd1\x88\xd0\xb8\xd0\xb1\xd0\xba\xd0\xb0";
+
 const char* const kTimeStrings[] = {kEnTime, kRuTime};
 const char* const kSettingsStrings[] = {kEnSettings, kRuSettings};
 const char* const kReadyStrings[] = {kEnReady, kRuReady};
 const char* const kAckStrings[] = {kEnAck, kRuAck};
 const char* const kStackStrings[] = {kEnStack, kRuStack};
 const char* const kRoomStrings[] = {kEnRoom, kRuRoom};
+const char* const kHelpStrings[] = {kEnHelp, kRuHelp};
+const char* const kErrorStrings[] = {kEnError, kRuError};
 
 /*
 U+uvwzyz

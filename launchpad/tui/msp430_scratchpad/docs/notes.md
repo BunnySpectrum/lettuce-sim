@@ -89,7 +89,7 @@ GPO
 - RCLK
 
 # Serial terminal
-tio -b 115200 --input-mode line /dev/cu.usbmodem214302
+tio -b 115200 /dev/cu.usbmodem214302
 Issues w/
 - CoolTerm (no cursor moves)
 - minicom (no line mode)

@@ -7,5 +7,7 @@ enum CmdProcessorState {
 };
 
 const char* const kCmdHelp = "help";
+const char* const kCmdLangEn = "en";
+const char* const kCmdLangRu = "ru";
 char const kSetLangEn[] = "e";
 char const kSetLangRu[] = "r";
