@@ -19,8 +19,22 @@
 // #define S2P_SRCLK P2_6
 // #define S2P_RCLK P2_7
 
+#define VT05
+
+#ifdef VT05
+#define kScreenWidth 72
+#define kScreenHeight 20
+#elif defined(VT50)
 #define kScreenWidth 80
-#define kScreenHeight 25
+#define kScreenHeight 12
+#elif defined(VT52)
+#define kScreenWidth 80
+#define kScreenHeight 24
+#elif defined(VT100)
+#define kScreenWidth 80
+#define kScreenHeight 24
+#endif
+
 #define STACK_PAINT_COLOR 0xABCD
 
 ByteStreamEnergia console_uart(0);
@@ -28,10 +42,10 @@ EeComposer composer(&console_uart);
 int language = LANG_EN;
 int prev_language = LANG_EN;
 uint8_t input_count = 0;
-uint32_t uptime_ms;
+uint32_t uptime_ms = 0;
 uint8_t debug_state = 0;
-
-void app_nop(const EeComposer& composer, RenderContext* context) {}
+bool needs_redraw = true;
+char buf[2];
 
 // void PulseS2PSrclk(uint8_t count) {
 //   digitalWrite(S2P_SRCLK, false);
@@ -82,28 +96,18 @@ const unsigned int kFlashUsed =
 
 const uint8_t kTopMargin = 0;
 const uint8_t kLeftMargin = 1;
-const uint8_t kNwWidth = 16;
-const uint8_t kNwHeight = 8;
 const uint8_t kMiddleMargin = 1;
 const uint8_t kMiddleGap = 2;
 const EePoint kHomePoint = EePoint(1 /*col*/, 1 /*row*/);
-const EePoint kDebugPoint = EePoint(1 /*col*/, 30 /*row*/);
+const EePoint kDebugPoint = EePoint(1 /*col*/, kScreenHeight + 2);
 
-const uint8_t kNeWidth = kScreenWidth - kNwWidth - kLeftMargin - kMiddleMargin;
-const uint8_t kNeHeight = kNwHeight;
-
-const uint8_t kSwWidth = kNwWidth;
-const uint8_t kSwHeight = (kScreenHeight - (kTopMargin + kMiddleGap + kNwHeight)) - 1;
-
-const uint8_t kSeWidth = kNeWidth;
-const uint8_t kSeHeight = kSwHeight;
+const uint8_t kNeWidth = kScreenWidth;
+const uint8_t kNeHeight = kScreenHeight;
 
 // Using char* const was -2B RAM, +30B Flash
-// char const kHbtValues[] = {'-', '\\', '|', '/'};
-// char kHbtString[2];
-char* const kHbtValues[] = {"-", "\\", "|", "/"};
+char* const kHbtValues[] = {"/", "\\"};
 uint8_t hbt_index = 0;
-#define MEM_SIZE 128
+#define MEM_SIZE 256
 uint8_t kenbakMemory[MEM_SIZE];
 uint8_t memory_index;
 
@@ -120,18 +124,8 @@ int8_t locale_string_delta(const char* const* locale_strings, uint8_t prev, uint
   }
 }
 
-void app_nw(const EeComposer& composer, RenderContext* context) {
-  composer.MoveTo(context->origin);
-  composer.ComposeStringC(kSettingsStrings[language]);
-  int8_t delta = locale_string_delta(kSettingsStrings, prev_language, language);
-  if (delta > 0) {
-    composer.ClearChars(delta);
-  }
-}
-
 // bool print_help = false;
-void app_ne(const EeComposer& composer, RenderContext* context) {
-  composer.MoveTo(context->origin);
+void app_ne(const EeComposer& composer) {
   composer.ComposeStringC(kTimeStrings[language]);
   composer.stream_->Write(0x20);
   composer.stream_->WriteDWord(uptime_ms);
@@ -140,45 +134,53 @@ void app_ne(const EeComposer& composer, RenderContext* context) {
   if (delta > 0) {
     composer.ClearChars(delta);
   }
+  composer.ClearToEndOfLine();
+
+  uint8_t row, col;
+
+  for (row = 0; row < 16; row++) {
+    composer.ComposeStringC("\r\n");
+
+    // write address
+    composer.stream_->Write(' ');
+    if (row == 0) {
+      composer.stream_->Write('0');
+    }
+    // composer.stream_->WriteHex(row * 0x10);
+    composer.stream_->Write(':');
+
+    // Write the 0xF values
+    for (col = 0; col < 16; col++) {
+      uint8_t value = kenbakMemory[row * 0x10 + col];
+      composer.stream_->Write(' ');
+      if (value <= 0xF) {
+        composer.stream_->Write('0');
+      }
+      // composer.stream_->WriteHex(value);
+    }
+  }
 }
 
-EeFrame nw_frame = EeFrame(EePoint(kHomePoint.col() + kLeftMargin, kHomePoint.row() + kTopMargin),
-                           kNwWidth, kNwHeight, app_nw);
-EeFrame ne_frame =
-    EeFrame(EePoint(nw_frame.origin().col() + kNwWidth + kMiddleMargin, nw_frame.origin().row()),
-            kNeWidth, kNeHeight, app_ne);
+//const EePoint kInputOrigin = EePoint(kHomePoint.col() + kLeftMargin, kHomePoint.row() + kTopMargin);
 
-const EePoint kInputOrigin =
-    EePoint(ne_frame.origin().col() + 1, kTopMargin + kNwHeight + kMiddleGap);
+EeText hbt_text = EeText(kDebugPoint);
 
-EeText hbt_text = EeText(EePoint(ne_frame.origin().col() - 1, kTopMargin + kNwHeight + kMiddleGap));
-
-EeText input_text = EeText(kInputOrigin);
-EeText status_text = EeText(EePoint(kLeftMargin + 2, hbt_text.origin().row()));
-
-void ComposeNW() {
-
-  nw_frame.Compose(composer);
-  // settings_text.Compose(composer);
-}
-void ComposeNE() {
-  ne_frame.Compose(composer);
-}
+EeText status_text = EeText(EePoint(kHomePoint.col(), kHomePoint.row() + 1));
+EeText input_text = EeText(EePoint(kLeftMargin + 2, hbt_text.origin().row()));
+EeFrame ne_frame = EeFrame(kHomePoint, kNeWidth, kNeHeight, app_ne);
 
 void ComposeSheet() {
-  composer.ShowCursor(false);
-  ComposeNW();
-  ComposeNE();
-  status_text.Compose(composer);
-  input_text.Compose(composer);
-  composer.MoveTo(input_text.origin() + EePoint(input_count == 0 ? 0 : 1 /*col*/, 0 /*row*/));
-  composer.ShowCursor(true);
+  SetRedLed(true);
+  // composer.ShowCursor(false);
+  ne_frame.Compose(composer);
+  // composer.ShowCursor(true);
+  SetRedLed(false);
 }
 
 CmdProcessorState cmd_state;
 
 int ReadCommand(uint8_t* character) {
-  char byte = console_uart.ReadByte();
+  const char byte = console_uart.ReadByte();
   if (byte < 0x20) {
     return -1;
   }
@@ -187,8 +189,13 @@ int ReadCommand(uint8_t* character) {
 }
 
 void print_debug() {
+  // composer.ShowCursor(false);
   composer.MoveTo(kDebugPoint);
-  composer.ComposeStringC("Ram used: ");
+
+  composer.MoveRight(2);
+  composer.ComposeStringC(buf);
+
+  composer.ComposeStringC("\r\nRam used: ");
   composer.stream_->WriteWord(kRamUsed);
   composer.ComposeStringC("\r\nFlash used: ");
   composer.stream_->WriteWord(kFlashUsed);
@@ -204,20 +211,24 @@ void print_debug() {
     }
   }
   composer.ClearChars(post_clear);
+  // composer.ShowCursor(true);
 }
 
 // How many ticks (today, 1tick = 1ms) until we run
 //  >0 = decrement each tick
 //  0 = ready to run
 //  <0 = do not update counter each tick
-#define HBT_TASK_PERIOD 200
-int16_t hbt_task_counter;
+#define HBT_TASK_PERIOD 20
+#define HBT_UPDATE_PERIOD 10
+uint8_t hbt_task_counter;
+uint8_t hbt_update_counter;
 
 uint16_t last_millis;
 const char* active_cmd;
 uint8_t cmd_idx;
 void setup() {
   hbt_task_counter = HBT_TASK_PERIOD;
+  hbt_update_counter = 0;
   memory_index = 0;
 
   console_uart.Configure(115200);
@@ -237,8 +248,7 @@ void setup() {
 
   hbt_text.SetText(kHbtValues[hbt_index]);
   composer.ClearScreen();
-
-  ComposeSheet();
+  composer.ShowCursor(false);
 
   volatile unsigned int sp;
   __asm__("MOV R1, %0" : "=r"(sp));
@@ -264,13 +274,7 @@ void setup() {
 //   test_recursion(--level);
 // }
 
-void task_hbt() {
-  hbt_index++;
-  hbt_index %= sizeof(kHbtValues) / sizeof(char*);
-  // kHbtString[0] = kHbtValues[hbt_index];
-  hbt_text.SetText(kHbtValues[hbt_index]);
-  // digitalWrite(GREEN_LED, hbt_index & 0x1);
-
+void task_update_room() {
   // Check stack
   int idx;
   volatile unsigned int sp;
@@ -281,21 +285,33 @@ void task_hbt() {
     }
   }
   ram_room_log.data->data.word = idx - stack_end;
+}
 
-  composer.ShowCursor(false);
+void task_hbt() {
+  hbt_index++;
+  hbt_index %= sizeof(kHbtValues) / sizeof(char*);
+  hbt_text.SetText(kHbtValues[hbt_index]);
+
+  // composer.ShowCursor(false);
   hbt_text.Compose(composer);
-  composer.MoveTo(input_text.origin() + EePoint(input_count == 0 ? 0 : 1 /*col*/, 0 /*row*/));
-  composer.ShowCursor(true);
-
-  kenbakMemory[memory_index++] = hbt_index;
-  if (memory_index > MEM_SIZE - 1) {
+  // composer.MoveTo(input_text.origin() + EePoint(input_count == 0 ? 0 : 1 /*col*/, 0 /*row*/));
+  composer.MoveTo(kHomePoint);
+  // composer.ShowCursor(true);
+  needs_redraw = true;
+}
+void increment_mem() {
+  kenbakMemory[memory_index] += 1;
+  // if (memory_index++ > MEM_SIZE - 1) {
+  //   memory_index = 0;
+  // }
+  if (memory_index++ == 15) {
     memory_index = 0;
   }
-  print_debug();
+  needs_redraw = true;
 }
 
 uint16_t ms_since_last_check(uint16_t* last_millis) {
-  uint16_t new_millis = millis();
+  const uint16_t new_millis = millis();
   uint16_t result;
 
   if (new_millis >= *last_millis) {
@@ -310,89 +326,122 @@ uint16_t ms_since_last_check(uint16_t* last_millis) {
 
 void loop() {
   // static RawCommand cmd;
-  uint8_t cmd;
 
   delay(1);
+  // XXX not the uptime check
   uptime_ms += ms_since_last_check(&last_millis);
 
   // Always check for data
+
   if (console_uart.Available()) {
+    // console_uart.ReadByte();
+    // digitalWrite(GREEN_LED, debug_state ^= 0x1);
 
-    if ((-1 != ReadCommand(&cmd))) {
-
-      if (cmd != ' ') {
-        input_text.Relocate(kInputOrigin + EePoint(input_count, 0 /*row*/));
-        input_count++;
-        input_text.SetText((char*)&cmd);
-      }
-      switch (cmd_state) {
-        case kReady:
-          if (cmd == kCmdHelp[cmd_idx]) {
-            cmd_state = kReceiving;
-            active_cmd = kCmdHelp;
-          } else if (cmd == kCmdLangEn[cmd_idx]) {
-            cmd_state = kReceiving;
-            active_cmd = kCmdLangEn;
-          } else if (cmd == kCmdLangRu[cmd_idx]) {
-            cmd_state = kReceiving;
-            active_cmd = kCmdLangRu;
-          } else {
-            active_cmd = 0;
-          }
-          break;
-        case kReceiving:
-          if (cmd == ' ') {
-            break;
-          }
-          cmd_idx++;
-          if ((0 == active_cmd[cmd_idx]) || (cmd != active_cmd[cmd_idx])) {
-            // gone past the command or mismatched
-            cmd_state = kDone;
-            active_cmd = 0;
-          }
-          break;
-        case kDone:
-          break;
-      }
-    } else {
-      digitalWrite(GREEN_LED, debug_state ^= 0x1);
-      // Saw a frame start after receiving text
-      input_text.Relocate(kInputOrigin);
-      composer.MoveTo(kInputOrigin);
-      composer.ClearChars(input_count);
-      input_text.SetText("");
-
-      bool valid_cmd = false;
-      if (active_cmd == kCmdLangEn) {
+    // }
+    buf[0] = console_uart.ReadByte();
+    buf[1] = '\0';
+    input_text.SetTextRaw(buf);
+    input_count = 1;
+    needs_redraw = true;
+    switch (buf[0]) {
+      case 'E':
         language = LANG_EN;
-        valid_cmd = true;
-      } else if (active_cmd == kCmdLangRu) {
+        break;
+      case 'R':
         language = LANG_RU;
-        valid_cmd = true;
-      }
-      if (valid_cmd) {
-        status_text.SetText(kAckStrings[language]);
-      } else {
-        status_text.SetText(kErrorStrings[language]);
-      }
-
-      cmd_state = kReady;
-      input_count = 0;
-      cmd_idx = 0;
+        break;
     }
-
-    // Draw
-    SetRedLed(true);
-    ComposeSheet();
-    SetRedLed(false);
-
-    prev_language = language;
+    status_text.SetText(kReadyStrings[language]);
   }
+  // if (false) {
+  //   uint8_t cmd = buf[0];
+
+  //   if (-1 != cmd) {
+
+  //     if (cmd != ' ') {
+  //       //input_text.Relocate(kInputOrigin + EePoint(input_count, 0 /*row*/));
+  //       input_count++;
+  //       input_text.SetText((char*)&cmd);
+  //     }
+  //     switch (cmd_state) {
+  //       case kReady:
+  //         if (cmd == kCmdHelp[cmd_idx]) {
+  //           cmd_state = kReceiving;
+  //           active_cmd = kCmdHelp;
+  //         } else if (cmd == kCmdLangEn[cmd_idx]) {
+  //           cmd_state = kReceiving;
+  //           active_cmd = kCmdLangEn;
+  //         } else if (cmd == kCmdLangRu[cmd_idx]) {
+  //           cmd_state = kReceiving;
+  //           active_cmd = kCmdLangRu;
+  //         } else {
+  //           active_cmd = 0;
+  //         }
+  //         break;
+  //       case kReceiving:
+  //         if (cmd == ' ') {
+  //           break;
+  //         }
+  //         cmd_idx++;
+  //         if ((0 == active_cmd[cmd_idx]) || (cmd != active_cmd[cmd_idx])) {
+  //           // gone past the command or mismatched
+  //           cmd_state = kDone;
+  //           active_cmd = 0;
+  //         }
+  //         break;
+  //       case kDone:
+  //         break;
+  //     }
+  //   } else {
+
+  //     // Saw a frame start after receiving text
+  //     //input_text.Relocate(kInputOrigin);
+  //     composer.MoveTo(kInputOrigin);
+  //     composer.ClearChars(input_count);
+  //     input_text.SetText("");
+
+  //     bool valid_cmd = false;
+  //     if (active_cmd == kCmdLangEn) {
+  //       language = LANG_EN;
+  //       valid_cmd = true;
+  //     } else if (active_cmd == kCmdLangRu) {
+  //       language = LANG_RU;
+  //       valid_cmd = true;
+  //     }
+  //     if (valid_cmd) {
+  //       status_text.SetText(kAckStrings[language]);
+  //     } else {
+  //       status_text.SetText(kErrorStrings[language]);
+  //     }
+
+  //     cmd_state = kReady;
+  //     input_count = 0;
+  //     cmd_idx = 0;
+  //   }
+
+  //   // Draw
+  //   needs_redraw = true;
+
+  //   prev_language = language;
+  // }
 
   if (hbt_task_counter > 0) {
     hbt_task_counter--;
   } else if (hbt_task_counter == 0) {
-    task_hbt();
+
+    task_update_room();
+    print_debug();
+    if (hbt_update_counter++ > HBT_UPDATE_PERIOD) {
+      hbt_update_counter = 0;
+      task_hbt();
+    }
+    increment_mem();
+
     hbt_task_counter = HBT_TASK_PERIOD;
+  }
+  if (needs_redraw) {
+    composer.ShowCursor(false);  // if host clears the terminal, we need to re-send
+    ComposeSheet();
+    needs_redraw = false;
   }
 }

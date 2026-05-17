@@ -13,6 +13,7 @@ class ByteStream {
 
   virtual size_t WriteStringC(const char* c_str) const = 0;
   virtual size_t WriteByte(uint8_t value) const = 0;
+  virtual size_t WriteHex(uint8_t value) const = 0;
   virtual size_t WriteWord(uint16_t value) const = 0;
   virtual size_t WriteDWord(uint32_t value) const = 0;
 

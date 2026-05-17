@@ -21,6 +21,7 @@ class EeText : public EeNode {
 
     text_ = text;
   }
+  void SetTextRaw(const char* text) { text_ = text; }
   void Compose(const EeComposer& composer) {
 
     composer.MoveTo(origin());

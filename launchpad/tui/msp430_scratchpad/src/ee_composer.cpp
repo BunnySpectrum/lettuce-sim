@@ -4,15 +4,6 @@
 #define CSI '['  // 0x5B
 EeComposer::EeComposer(const ByteStream* stream) : stream_(stream) {};
 
-// See header for rom/room tradeoff
-// void EeComposer::CarriageReturn(const RenderContext* context) const {
-//   MoveTo(EePoint(context->origin.col(), context->active_row));
-// }
-// void EeComposer::LineFeed(RenderContext* context) const {
-//   stream_->Write('\n');
-//   context->active_row++;
-// }
-
 void EeComposer::MoveTo(const EePoint& point) const {
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(point.row());
@@ -31,6 +22,11 @@ void EeComposer::MoveLeft(uint8_t columns) const {
   stream_->WriteByte(columns);
   stream_->Write('D');
 }
+void EeComposer::MoveRight(uint8_t columns) const {
+  stream_->WriteStringC("\x1b[");
+  stream_->WriteByte(columns);
+  stream_->Write('C');
+}
 
 void EeComposer::ClearScreen() const {
   stream_->WriteStringC("\x1b[2J");
@@ -39,11 +35,6 @@ void EeComposer::ClearChars(uint8_t len) const {
   if (len <= 0) {
     return;
   }
-  // while (len > 0) {
-  //   stream_->Write(' ');
-  //   len--;
-  // }
-  // return;
   stream_->Write(' ');
   if (len == 1) {
     return;
@@ -51,6 +42,11 @@ void EeComposer::ClearChars(uint8_t len) const {
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(len - 1);
   stream_->Write(0x62);
+}
+void EeComposer::ClearToEndOfLine() const {
+  stream_->WriteStringC("\x1b[");
+  stream_->WriteByte(0);
+  stream_->Write(0x4B);
 }
 
 void EeComposer::ShowCursor(bool show) const {
