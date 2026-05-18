@@ -8,6 +8,7 @@ class EeComposer {
  public:
   EeComposer(const ByteStream* stream);
   void MoveTo(const EePoint& point) const;
+  void MoveTo(uint8_t row, uint8_t col) const;
   void MoveLeft(uint8_t columns) const;
   void MoveRight(uint8_t columns) const;
   void MoveDown(uint8_t rows) const;

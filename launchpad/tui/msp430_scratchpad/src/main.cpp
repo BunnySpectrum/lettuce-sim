@@ -35,16 +35,17 @@
 #define kScreenHeight 24
 #endif
 
-#define STACK_PAINT_COLOR 0xABCD
+#define STACK_PAINT_COLOR 0xAC1D
 
 ByteStreamEnergia console_uart(0);
 EeComposer composer(&console_uart);
-int language = LANG_EN;
-int prev_language = LANG_EN;
+uint8_t language = LANG_EN;
+uint8_t prev_language = LANG_EN;
 uint8_t input_count = 0;
 uint32_t uptime_ms = 0;
+uint16_t compose_duration_ms = 0;
 uint8_t debug_state = 0;
-bool needs_redraw = true;
+bool needs_redraw = false;
 char buf[2];
 
 // void PulseS2PSrclk(uint8_t count) {
@@ -56,10 +57,6 @@ char buf[2];
 //     delayMicroseconds(1);
 //   }
 // }
-
-void SetRedLed(bool state) {
-  digitalWrite(RED_LED, state);
-}
 
 // void GetReport() {
 // Serial.write(ESC);
@@ -100,19 +97,26 @@ const uint8_t kMiddleMargin = 1;
 const uint8_t kMiddleGap = 2;
 const EePoint kHomePoint = EePoint(1 /*col*/, 1 /*row*/);
 const EePoint kDebugPoint = EePoint(1 /*col*/, kScreenHeight + 2);
+const EePoint kInputPoint = EePoint(kLeftMargin + 2, kDebugPoint.row());
 
-const uint8_t kNeWidth = kScreenWidth;
-const uint8_t kNeHeight = kScreenHeight;
+const uint8_t kAppMemWidth = 16 * 3 + 3 + 2;
+const uint8_t kAppMemHeight = 16 + 1;
+
+const uint8_t kAppSideWidth = kScreenWidth - kAppMemWidth;
+const uint8_t kAppSideHeight = kAppMemHeight;
 
 // Using char* const was -2B RAM, +30B Flash
 char* const kHbtValues[] = {"/", "\\"};
 uint8_t hbt_index = 0;
 #define MEM_SIZE 256
 uint8_t kenbakMemory[MEM_SIZE];
-uint8_t memory_index;
+bool redraw_memory = true;
 
-FormatData ram_room_data = FormatData(uint16_t(0));
-LogMessage ram_room_log = {kRoomStrings, &ram_room_data};
+uint16_t ram_room = 0;
+bool sample_room = true;
+uint16_t pre_room, post_room, room_setup_pre, room_setup_post;
+// FormatData ram_room_data = FormatData(uint16_t(0));
+// LogMessage ram_room_log = {kRoomStrings, &ram_room_data};
 
 int8_t locale_string_delta(const char* const* locale_strings, uint8_t prev, uint8_t current) {
   if (prev_language != language) {
@@ -124,40 +128,67 @@ int8_t locale_string_delta(const char* const* locale_strings, uint8_t prev, uint
   }
 }
 
-// bool print_help = false;
-void app_ne(const EeComposer& composer) {
-  composer.ComposeStringC(kTimeStrings[language]);
-  composer.stream_->Write(0x20);
-  composer.stream_->WriteDWord(uptime_ms);
-
-  int8_t delta = locale_string_delta(kTimeStrings, prev_language, language);
-  if (delta > 0) {
-    composer.ClearChars(delta);
-  }
-  composer.ClearToEndOfLine();
-
-  uint8_t row, col;
-
-  for (row = 0; row < 16; row++) {
-    composer.ComposeStringC("\r\n");
-
-    // write address
-    composer.stream_->Write(' ');
-    if (row == 0) {
-      composer.stream_->Write('0');
-    }
-    // composer.stream_->WriteHex(row * 0x10);
-    composer.stream_->Write(':');
-
-    // Write the 0xF values
-    for (col = 0; col < 16; col++) {
-      uint8_t value = kenbakMemory[row * 0x10 + col];
-      composer.stream_->Write(' ');
-      if (value <= 0xF) {
-        composer.stream_->Write('0');
+int task_update_room() {
+  // Check stack
+  int idx;
+  bool found = false;
+  int result;
+  volatile unsigned int sp;
+  __asm__("MOV R1, %0" : "=r"(sp));
+  for (idx = sp; idx > stack_end; idx -= 2) {
+    if (*((unsigned int*)idx) == STACK_PAINT_COLOR) {
+      if (!found) {
+        result = idx;
+        found = true;
       }
-      // composer.stream_->WriteHex(value);
+    } else if (found) {
+      // we previously found a false end of the stack
+      // reset the 'found' flag
+      found = false;
     }
+  }
+  if (found) {
+    return result - stack_end;
+  } else {
+    return 0;
+  }
+}
+
+void app_mem() {
+  // Example to print w/ locale change
+  // composer.ComposeStringC(kTimeStrings[language]);
+  // composer.stream_->Write(0x20);
+  // composer.stream_->WriteDWord(uptime_ms);
+
+  // int8_t delta = locale_string_delta(kTimeStrings, prev_language, language);
+  // if (delta > 0) {
+  //   composer.ClearChars(delta);
+  // }
+  // composer.ClearToEndOfLine();
+
+  if (redraw_memory) {
+    for (uint8_t row = 0; row < 16; row++) {
+
+      // write address
+      composer.stream_->WriteHex(row * 0x10);
+      composer.stream_->Write(':');
+
+      // Write the 0xF values
+      for (uint8_t col = 0; col < 16; col++) {
+        uint8_t value = kenbakMemory[row * 0x10 + col];
+        composer.stream_->Write(' ');
+        composer.stream_->WriteHex(value);
+      }
+
+      // composer.MoveTo(row + 1 + 2, 2);
+      composer.stream_->WriteStringC("\x1b[");
+      composer.stream_->WriteByte(row + 1 + 2);
+      composer.stream_->Write(';');
+      composer.stream_->WriteByte(2);
+      composer.stream_->Write('H');
+    }
+
+    redraw_memory = true;
   }
 }
 
@@ -165,16 +196,27 @@ void app_ne(const EeComposer& composer) {
 
 EeText hbt_text = EeText(kDebugPoint);
 
-EeText status_text = EeText(EePoint(kHomePoint.col(), kHomePoint.row() + 1));
-EeText input_text = EeText(EePoint(kLeftMargin + 2, hbt_text.origin().row()));
-EeFrame ne_frame = EeFrame(kHomePoint, kNeWidth, kNeHeight, app_ne);
+EeText input_text = EeText(kInputPoint);
+//EeFrame ne_frame = EeFrame(kHomePoint, kAppMemWidth, kAppMemHeight, app_mem);
 
 void ComposeSheet() {
-  SetRedLed(true);
-  // composer.ShowCursor(false);
-  ne_frame.Compose(composer);
-  // composer.ShowCursor(true);
-  SetRedLed(false);
+  uint16_t start = millis();
+
+  digitalWrite(RED_LED, true);
+
+  // ne_frame.Compose(composer);
+  composer.MoveTo(kHomePoint);
+  composer.ComposeBar(true /*is_top*/, kAppMemWidth);
+  composer.MoveTo(kHomePoint);
+  composer.MoveRight(1);
+  composer.MoveDown(1);
+  app_mem();
+  composer.MoveTo(kHomePoint);
+  composer.MoveDown(kAppMemHeight);
+  composer.ComposeBar(false /*is_top*/, kAppMemWidth);
+
+  digitalWrite(RED_LED, false);
+  compose_duration_ms = millis() - start;
 }
 
 CmdProcessorState cmd_state;
@@ -187,31 +229,86 @@ int ReadCommand(uint8_t* character) {
   *character = byte;
   return 0;
 }
-
+uint16_t room_max = 0;
 void print_debug() {
-  // composer.ShowCursor(false);
-  composer.MoveTo(kDebugPoint);
+  hbt_text.Compose(composer);
 
-  composer.MoveRight(2);
+  // composer.MoveTo(kDebugPoint);
+  composer.stream_->WriteStringC("\x1b[");
+  composer.stream_->WriteByte(kDebugPoint.row());
+  composer.stream_->Write(';');
+  composer.stream_->WriteByte(kDebugPoint.col());
+  composer.stream_->Write('H');
+
+  // Last entered character
+  // composer.MoveRight(2);
+  composer.stream_->WriteStringC("\x1b[");
+  composer.stream_->WriteByte(2);
+  composer.stream_->Write('C');
   composer.ComposeStringC(buf);
 
+  // Uptime
+  composer.ComposeStringC("\r\nUptime (ms): ");
+  composer.stream_->WriteDWord(uptime_ms);
+
+  // Last compose duration
+  composer.ComposeStringC("\r\nCompose (ms): ");
+  composer.stream_->WriteWord(compose_duration_ms);
+  composer.ClearToEndOfLine();
+
+  // Amount of RAM used
   composer.ComposeStringC("\r\nRam used: ");
   composer.stream_->WriteWord(kRamUsed);
+
+  // Amount of flash used
   composer.ComposeStringC("\r\nFlash used: ");
   composer.stream_->WriteWord(kFlashUsed);
+
+  // Remaining stack we could use
   composer.ComposeStringC("\r\nRoom: ");
-  composer.stream_->WriteWord(ram_room_log.data->data.word);
-#define WORD ram_room_log.data->data.word
-  uint8_t post_clear = 0;
-  // Only 512B ram, so only need to check up to 3 digits
-  if (WORD < 100) {
-    post_clear++;
-    if (WORD < 10) {
-      post_clear++;
-    }
-  }
-  composer.ClearChars(post_clear);
-  // composer.ShowCursor(true);
+  // composer.stream_->WriteWord(ram_room_log.data->data.word);
+  // #define WORD ram_room_log.data->data.word
+  //   uint8_t post_clear = 0;
+  //   // Only 512B ram, so only need to check up to 3 digits
+  //   if (WORD < 100) {
+  //     post_clear++;
+  //     if (WORD < 10) {
+  //       post_clear++;
+  //     }
+  //   }
+  //   composer.ClearChars(post_clear);
+  composer.stream_->WriteWord(ram_room);
+  composer.ClearToEndOfLine();
+
+  composer.ComposeStringC("\r\nRoom (setup_pre): ");
+  composer.stream_->WriteWord(room_setup_pre);
+
+  composer.ComposeStringC("\r\nRoom (setup_post): ");
+  composer.stream_->WriteWord(room_setup_post);
+
+  composer.ComposeStringC("\r\nRoom (debug_pre): ");
+  composer.stream_->WriteWord(pre_room);
+
+  composer.ComposeStringC("\r\nRoom (debug_post): ");
+  composer.stream_->WriteWord(post_room);
+
+  composer.ComposeStringC("\r\nRoom (setup delta): ");
+  composer.stream_->WriteWord(room_setup_pre - room_setup_post);
+
+  composer.ComposeStringC("\r\nRoom (debug delta): ");
+  composer.stream_->WriteWord(pre_room - post_room);
+
+  composer.ComposeStringC("\r\nPC: ");
+  composer.stream_->WriteWord(kenbakMemory[3]);
+}
+void print_room() {
+
+  composer.stream_->WriteWord(room_max);
+  composer.stream_->Write('>');
+  // composer.stream_->WriteWord(ram_room_log.data->data.word);
+  composer.stream_->WriteWord(ram_room);
+
+  composer.stream_->Write('.');
 }
 
 // How many ticks (today, 1tick = 1ms) until we run
@@ -219,45 +316,41 @@ void print_debug() {
 //  0 = ready to run
 //  <0 = do not update counter each tick
 #define HBT_TASK_PERIOD 20
-#define HBT_UPDATE_PERIOD 10
+#define HBT_UPDATE_PERIOD 50
 uint8_t hbt_task_counter;
 uint8_t hbt_update_counter;
 
 uint16_t last_millis;
 const char* active_cmd;
 uint8_t cmd_idx;
+
 void setup() {
-  hbt_task_counter = HBT_TASK_PERIOD;
-  hbt_update_counter = 0;
-  memory_index = 0;
-
-  console_uart.Configure(115200);
-  pinMode(RED_LED, OUTPUT);
-  pinMode(GREEN_LED, OUTPUT);
-
-  // pinMode(P2S_SH_LDL, OUTPUT);
-  // pinMode(P2S_CLK, OUTPUT);
-  // pinMode(P2S_OUT, INPUT);
-
-  // pinMode(S2P_SER, OUTPUT);
-  // pinMode(S2P_SRCLK, OUTPUT);
-  // pinMode(S2P_RCLK, OUTPUT);
-
-  input_text.SetText("");
-  status_text.SetText(kReadyStrings[language]);
-
-  hbt_text.SetText(kHbtValues[hbt_index]);
-  composer.ClearScreen();
-  composer.ShowCursor(false);
-
   volatile unsigned int sp;
   __asm__("MOV R1, %0" : "=r"(sp));
   unsigned int idx;
   for (idx = sp; idx > stack_end; idx -= 2) {
     *((unsigned int*)idx) = STACK_PAINT_COLOR;
   }
+  room_setup_pre = task_update_room();  //130
+  console_uart.Configure(115200);       // -38 to room
+  // console_uart.stream_->begin(115200);   // -36
+  room_setup_post = task_update_room();  // 92
+
+  hbt_task_counter = HBT_TASK_PERIOD;
+  hbt_update_counter = 0;
+
+  pinMode(RED_LED, OUTPUT);
+  pinMode(GREEN_LED, OUTPUT);
+
+  input_text.SetText("");
+
+  hbt_text.SetText(kHbtValues[hbt_index]);
+  // composer.ClearScreen();
+  composer.stream_->WriteStringC("\x1b[2J");
+  composer.ShowCursor(false);
 
   last_millis = millis();
+  pre_room = task_update_room();
 }
 
 // void test_recursion(uint8_t level) {
@@ -274,39 +367,11 @@ void setup() {
 //   test_recursion(--level);
 // }
 
-void task_update_room() {
-  // Check stack
-  int idx;
-  volatile unsigned int sp;
-  __asm__("MOV R1, %0" : "=r"(sp));
-  for (idx = sp; idx > stack_end; idx -= 2) {
-    if (*((unsigned int*)idx) == STACK_PAINT_COLOR) {
-      break;
-    }
-  }
-  ram_room_log.data->data.word = idx - stack_end;
-}
-
 void task_hbt() {
   hbt_index++;
   hbt_index %= sizeof(kHbtValues) / sizeof(char*);
   hbt_text.SetText(kHbtValues[hbt_index]);
 
-  // composer.ShowCursor(false);
-  hbt_text.Compose(composer);
-  // composer.MoveTo(input_text.origin() + EePoint(input_count == 0 ? 0 : 1 /*col*/, 0 /*row*/));
-  composer.MoveTo(kHomePoint);
-  // composer.ShowCursor(true);
-  needs_redraw = true;
-}
-void increment_mem() {
-  kenbakMemory[memory_index] += 1;
-  // if (memory_index++ > MEM_SIZE - 1) {
-  //   memory_index = 0;
-  // }
-  if (memory_index++ == 15) {
-    memory_index = 0;
-  }
   needs_redraw = true;
 }
 
@@ -325,34 +390,34 @@ uint16_t ms_since_last_check(uint16_t* last_millis) {
 }
 
 void loop() {
-  // static RawCommand cmd;
+  // setup -> loop, no extra stack
 
-  delay(1);
-  // XXX not the uptime check
-  uptime_ms += ms_since_last_check(&last_millis);
+  delay(1);  // not it
 
-  // Always check for data
+  // removing did +4 to room
+  uptime_ms += ms_since_last_check(&last_millis);  //not it
 
-  if (console_uart.Available()) {
-    // console_uart.ReadByte();
-    // digitalWrite(GREEN_LED, debug_state ^= 0x1);
+  // removing did +4 to room
+  // if (console_uart.Available()) {
+  //   // console_uart.ReadByte();
+  //   // digitalWrite(GREEN_LED, debug_state ^= 0x1);
 
-    // }
-    buf[0] = console_uart.ReadByte();
-    buf[1] = '\0';
-    input_text.SetTextRaw(buf);
-    input_count = 1;
-    needs_redraw = true;
-    switch (buf[0]) {
-      case 'E':
-        language = LANG_EN;
-        break;
-      case 'R':
-        language = LANG_RU;
-        break;
-    }
-    status_text.SetText(kReadyStrings[language]);
-  }
+  //   // }
+  //   buf[0] = console_uart.ReadByte();
+  //   buf[1] = '\0';
+  //   input_text.SetTextRaw(buf);
+  //   input_count = 1;
+  //   needs_redraw = true;
+  //   switch (buf[0]) {
+  //     case 'E':
+  //       language = LANG_EN;
+  //       break;
+  //     case 'R':
+  //       language = LANG_RU;
+  //       break;
+  //   }
+  // }
+
   // if (false) {
   //   uint8_t cmd = buf[0];
 
@@ -429,19 +494,32 @@ void loop() {
     hbt_task_counter--;
   } else if (hbt_task_counter == 0) {
 
-    task_update_room();
-    print_debug();
+    ram_room = task_update_room();  // not it
+
+    if (ram_room > room_max) {
+      room_max = ram_room;
+    }
+
     if (hbt_update_counter++ > HBT_UPDATE_PERIOD) {
       hbt_update_counter = 0;
-      task_hbt();
+      //task_hbt();
     }
-    increment_mem();
+    if (sample_room) {
+      pre_room = task_update_room();
+    }
+    print_debug();
+    if (sample_room) {
+      post_room = task_update_room();
+      sample_room = false;
+    }
+    // print_room();
 
     hbt_task_counter = HBT_TASK_PERIOD;
   }
   if (needs_redraw) {
-    composer.ShowCursor(false);  // if host clears the terminal, we need to re-send
-    ComposeSheet();
+    //composer.ShowCursor(false);  // if host clears the terminal, we need to re-send
+    // ComposeSheet();
+
     needs_redraw = false;
   }
 }

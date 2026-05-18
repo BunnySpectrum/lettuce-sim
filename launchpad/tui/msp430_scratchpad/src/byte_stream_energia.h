@@ -24,7 +24,6 @@ class ByteStreamEnergia : public ByteStream {
   size_t WriteStringC(const char* c_str) const { return stream_->print(c_str); }
 
   size_t WriteByte(uint8_t value) const { stream_->print(value); }
-  size_t WriteHex(uint8_t value) const { stream_->print(value, 16); }
   size_t WriteWord(uint16_t value) const { stream_->print(value); }
   size_t WriteDWord(uint32_t value) const { stream_->print(value); }
 
@@ -32,6 +31,6 @@ class ByteStreamEnergia : public ByteStream {
   //   return stream_->parseInt
   // }
 
- private:
+  //  private:
   HardwareSerial* stream_;
 };

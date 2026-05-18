@@ -12,6 +12,14 @@ void EeComposer::MoveTo(const EePoint& point) const {
   stream_->Write('H');
 }
 
+void EeComposer::MoveTo(uint8_t row, uint8_t col) const {
+  stream_->WriteStringC("\x1b[");
+  stream_->WriteByte(row);
+  stream_->Write(';');
+  stream_->WriteByte(col);
+  stream_->Write('H');
+}
+
 void EeComposer::MoveDown(uint8_t rows) const {
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(rows);
