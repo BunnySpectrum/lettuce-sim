@@ -100,3 +100,5 @@ minicom -b 115200 -D /dev/cu.usbmodem21202
 
 # unicode
 b"".join([x.encode('utf-8') for x in ru_settings])
+
+# Stack usage

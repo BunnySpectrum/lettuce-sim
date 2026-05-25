@@ -57,7 +57,7 @@ class EeMessage : public EeNode {
       composer.MoveLeft(1);
     }
     composer.ComposeStringC(msg_->text[lang]);
-    composer.stream_->Write(0x20);
+    composer.stream_->WriteChar(0x20);
     switch (msg_->data->tag) {
       case 1:
         composer.stream_->WriteByte(msg_->data->data.byte);

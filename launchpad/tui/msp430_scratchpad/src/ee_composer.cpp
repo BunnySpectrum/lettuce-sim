@@ -7,33 +7,33 @@ EeComposer::EeComposer(const ByteStream* stream) : stream_(stream) {};
 void EeComposer::MoveTo(const EePoint& point) const {
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(point.row());
-  stream_->Write(';');
+  stream_->WriteChar(';');
   stream_->WriteByte(point.col());
-  stream_->Write('H');
+  stream_->WriteChar('H');
 }
 
 void EeComposer::MoveTo(uint8_t row, uint8_t col) const {
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(row);
-  stream_->Write(';');
+  stream_->WriteChar(';');
   stream_->WriteByte(col);
-  stream_->Write('H');
+  stream_->WriteChar('H');
 }
 
 void EeComposer::MoveDown(uint8_t rows) const {
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(rows);
-  stream_->Write('B');
+  stream_->WriteChar('B');
 }
 void EeComposer::MoveLeft(uint8_t columns) const {
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(columns);
-  stream_->Write('D');
+  stream_->WriteChar('D');
 }
 void EeComposer::MoveRight(uint8_t columns) const {
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(columns);
-  stream_->Write('C');
+  stream_->WriteChar('C');
 }
 
 void EeComposer::ClearScreen() const {
@@ -43,26 +43,26 @@ void EeComposer::ClearChars(uint8_t len) const {
   if (len <= 0) {
     return;
   }
-  stream_->Write(' ');
+  stream_->WriteChar(' ');
   if (len == 1) {
     return;
   }
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(len - 1);
-  stream_->Write(0x62);
+  stream_->WriteChar(0x62);
 }
 void EeComposer::ClearToEndOfLine() const {
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(0);
-  stream_->Write(0x4B);
+  stream_->WriteChar(0x4B);
 }
 
 void EeComposer::ShowCursor(bool show) const {
   stream_->WriteStringC("\x1b[?25");
   if (show) {
-    stream_->Write('h');
+    stream_->WriteChar('h');
   } else {
-    stream_->Write('l');
+    stream_->WriteChar('l');
   }
 }
 
@@ -76,11 +76,20 @@ void EeComposer::ComposeBar(bool is_top, uint8_t len) const {
     right_corner = '/';
   }
 
-  stream_->Write(left_corner);
+  stream_->WriteChar(left_corner);
   stream_->WriteStringC("-\x1b[");
   stream_->WriteByte(len - 3);
-  stream_->Write(0x62);
-  stream_->Write(right_corner);
+  stream_->WriteChar(0x62);
+  stream_->WriteChar(right_corner);
+}
+
+void EeComposer::ComposeDiv(uint8_t len) const {
+
+  stream_->WriteChar('|');
+  stream_->WriteStringC("-\x1b[");
+  stream_->WriteByte(len - 3);
+  stream_->WriteChar(0x62);
+  stream_->WriteChar('|');
 }
 
 void EeComposer::ComposeStringC(const char* text) const {

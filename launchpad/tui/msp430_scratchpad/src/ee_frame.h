@@ -14,7 +14,8 @@ class EeFrame : public EeNode {
   uint8_t height() const { return height_; }
   void Compose(const EeComposer& composer) {
     composer.MoveTo(origin());
-    composer.ComposeBar(true /*is_top*/, width());
+    // composer.ComposeBar(true /*is_top*/, width());
+    composer.ComposeDiv(width());
 
     // Move to content origin
     composer.MoveTo(origin());
@@ -24,7 +25,8 @@ class EeFrame : public EeNode {
 
     composer.MoveTo(origin());
     composer.MoveDown(height());
-    composer.ComposeBar(false /*is_top*/, width());
+    // composer.ComposeBar(false /*is_top*/, width());
+    composer.ComposeDiv(width());
   }
 
  private:

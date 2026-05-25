@@ -19,17 +19,10 @@ class ByteStreamEnergia : public ByteStream {
   char ReadByte() const { return stream_->read(); }
 
   size_t Write(const uint8_t* buffer, size_t size) const { return stream_->write(buffer, size); }
-  size_t Write(uint8_t value) const { return stream_->write(value); }
 
   size_t WriteStringC(const char* c_str) const { return stream_->print(c_str); }
 
-  size_t WriteByte(uint8_t value) const { stream_->print(value); }
-  size_t WriteWord(uint16_t value) const { stream_->print(value); }
-  size_t WriteDWord(uint32_t value) const { stream_->print(value); }
-
-  // int ParseStringToInt() const {
-  //   return stream_->parseInt
-  // }
+  size_t WriteChar(uint8_t value) const { stream_->write(value); }
 
   //  private:
   HardwareSerial* stream_;
