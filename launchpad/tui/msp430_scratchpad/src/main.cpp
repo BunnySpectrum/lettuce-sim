@@ -1,4 +1,4 @@
-#include "byte_stream_energia.h"
+#include "arduino/byte_stream_arduino.h"
 #include "cmd_processor.h"
 #include "ee_composer.h"
 #include "ee_frame.h"

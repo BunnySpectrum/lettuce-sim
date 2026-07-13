@@ -1,10 +1,11 @@
 #include "ee_composer.h"
 
 #define ESC 0x1b
-#define CSI '['  // 0x5B
-EeComposer::EeComposer(const ByteStream* stream) : stream_(stream) {};
+#define CSI '[' // 0x5B
+EeComposer::EeComposer(const ByteStream *stream) : stream_(stream) {};
 
-void EeComposer::MoveTo(const EePoint& point) const {
+void EeComposer::MoveTo(const EePoint &point) const
+{
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(point.row());
   stream_->WriteChar(';');
@@ -12,7 +13,8 @@ void EeComposer::MoveTo(const EePoint& point) const {
   stream_->WriteChar('H');
 }
 
-void EeComposer::MoveTo(uint8_t row, uint8_t col) const {
+void EeComposer::MoveTo(uint8_t row, uint8_t col) const
+{
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(row);
   stream_->WriteChar(';');
@@ -20,58 +22,74 @@ void EeComposer::MoveTo(uint8_t row, uint8_t col) const {
   stream_->WriteChar('H');
 }
 
-void EeComposer::MoveDown(uint8_t rows) const {
+void EeComposer::MoveDown(uint8_t rows) const
+{
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(rows);
   stream_->WriteChar('B');
 }
-void EeComposer::MoveLeft(uint8_t columns) const {
+void EeComposer::MoveLeft(uint8_t columns) const
+{
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(columns);
   stream_->WriteChar('D');
 }
-void EeComposer::MoveRight(uint8_t columns) const {
+void EeComposer::MoveRight(uint8_t columns) const
+{
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(columns);
   stream_->WriteChar('C');
 }
 
-void EeComposer::ClearScreen() const {
+void EeComposer::ClearScreen() const
+{
   stream_->WriteStringC("\x1b[2J");
 }
-void EeComposer::ClearChars(uint8_t len) const {
-  if (len <= 0) {
+void EeComposer::ClearChars(uint8_t len) const
+{
+  if (len <= 0)
+  {
     return;
   }
   stream_->WriteChar(' ');
-  if (len == 1) {
+  if (len == 1)
+  {
     return;
   }
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(len - 1);
   stream_->WriteChar(0x62);
 }
-void EeComposer::ClearToEndOfLine() const {
+void EeComposer::ClearToEndOfLine() const
+{
   stream_->WriteStringC("\x1b[");
   stream_->WriteByte(0);
   stream_->WriteChar(0x4B);
 }
 
-void EeComposer::ShowCursor(bool show) const {
+void EeComposer::ShowCursor(bool show) const
+{
   stream_->WriteStringC("\x1b[?25");
-  if (show) {
+  if (show)
+  {
     stream_->WriteChar('h');
-  } else {
+  }
+  else
+  {
     stream_->WriteChar('l');
   }
 }
 
-void EeComposer::ComposeBar(bool is_top, uint8_t len) const {
+void EeComposer::ComposeBar(bool is_top, uint8_t len) const
+{
   uint8_t left_corner, right_corner;
-  if (is_top) {
+  if (is_top)
+  {
     left_corner = '/';
     right_corner = '\\';
-  } else {
+  }
+  else
+  {
     left_corner = '\\';
     right_corner = '/';
   }
@@ -83,7 +101,8 @@ void EeComposer::ComposeBar(bool is_top, uint8_t len) const {
   stream_->WriteChar(right_corner);
 }
 
-void EeComposer::ComposeDiv(uint8_t len) const {
+void EeComposer::ComposeDiv(uint8_t len) const
+{
 
   stream_->WriteChar('|');
   stream_->WriteStringC("-\x1b[");
@@ -92,7 +111,8 @@ void EeComposer::ComposeDiv(uint8_t len) const {
   stream_->WriteChar('|');
 }
 
-void EeComposer::ComposeStringC(const char* text) const {
+void EeComposer::ComposeStringC(const char *text) const
+{
   stream_->WriteStringC(text);
 }
 #undef ESC

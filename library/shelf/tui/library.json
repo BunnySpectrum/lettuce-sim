@@ -1,0 +1,7 @@
+{
+  "name": "TUI",
+  "version": "0.0.1",
+  "description": "Text user interface modules.",
+  "frameworks": ["arduino", "energia", "stm32cube"],
+  "platforms": ["timsp430","atmelavr"]
+}

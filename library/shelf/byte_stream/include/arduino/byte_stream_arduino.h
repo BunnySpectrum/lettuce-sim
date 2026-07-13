@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <stdint.h>
 #include "byte_stream.h"
-#include "ee_composer.h"
 
 class ByteStreamEnergia : public ByteStream {
  public:

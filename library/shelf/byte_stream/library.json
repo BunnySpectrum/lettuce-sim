@@ -1,0 +1,7 @@
+{
+  "name": "ByteStream",
+  "version": "0.0.1",
+  "description": "Approximate a stream of bytes.",
+  "frameworks": ["arduino", "energia", "stm32cube"],
+  "platforms": ["timsp430","atmelavr"]
+}
