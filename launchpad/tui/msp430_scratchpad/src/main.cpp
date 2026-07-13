@@ -24,9 +24,6 @@
 #ifdef VT05
 #define kScreenWidth 72
 #define kScreenHeight 20
-#elif defined(VT50)
-#define kScreenWidth 80
-#define kScreenHeight 12
 #elif defined(VT52)
 #define kScreenWidth 80
 #define kScreenHeight 24
@@ -104,7 +101,7 @@ const uint8_t kLeftMargin = 1;
 const uint8_t kMiddleMargin = 1;
 const uint8_t kMiddleGap = 2;
 const EePoint kHomePoint = EePoint(1 /*col*/, 1 /*row*/);
-const EePoint kDebugPoint = EePoint(1 /*col*/, kScreenHeight + 2);
+const EePoint kDebugPoint = EePoint(kScreenWidth + 1, 1 /* row */);
 const EePoint kInputPoint = EePoint(kLeftMargin + 2, kDebugPoint.row());
 
 const EePoint kNwPoint = kHomePoint;
@@ -257,6 +254,7 @@ void print_debug() {
   //   meas_room = false;
   // }
 
+  uint8_t line = 0;
   composer.MoveTo(kDebugPoint);
 
   // Last entered character
@@ -264,28 +262,40 @@ void print_debug() {
   composer.ComposeStringC(buf);
 
   // Uptime
-  composer.ComposeStringC("\r\nUptime (ms): ");
+  composer.MoveTo(kDebugPoint);
+  composer.MoveDown(++line);
+  composer.ComposeStringC("Uptime (ms): ");
   composer.stream_->WriteDWord(uptime_ms);
 
   // Last compose duration
-  composer.ComposeStringC("\r\nCompose (ms): ");
+  composer.MoveTo(kDebugPoint);
+  composer.MoveDown(++line);
+  composer.ComposeStringC("Compose (ms): ");
   composer.stream_->WriteWord(compose_duration_ms);
   composer.ClearToEndOfLine();
 
   // Amount of RAM used
-  composer.ComposeStringC("\r\nRam used: ");
+  composer.MoveTo(kDebugPoint);
+  composer.MoveDown(++line);
+  composer.ComposeStringC("Ram used: ");
   composer.stream_->WriteWord(kRamUsed);
 
   // Amount of flash used
-  composer.ComposeStringC("\r\nFlash used: ");
+  composer.MoveTo(kDebugPoint);
+  composer.MoveDown(++line);
+  composer.ComposeStringC("Flash used: ");
   composer.stream_->WriteWord(kFlashUsed);
 
   // Remaining stack we could use
-  composer.ComposeStringC("\r\nRoom: ");
+  composer.MoveTo(kDebugPoint);
+  composer.MoveDown(++line);
+  composer.ComposeStringC("Room: ");
   composer.stream_->WriteWord(ram_room);
   composer.ClearToEndOfLine();
 
-  composer.ComposeStringC("\r\nRoom @ setup(): ");
+  composer.MoveTo(kDebugPoint);
+  composer.MoveDown(++line);
+  composer.ComposeStringC("Room @ setup(): ");
   composer.stream_->WriteWord(room_setup_pre);
 
   // composer.ComposeStringC("\r\nRoom (setup_post): ");
@@ -293,20 +303,28 @@ void print_debug() {
 
   // composer.ComposeStringC("\r\nRoom (debug_pre): ");
   // composer.stream_->WriteWord(pre_room);
-  composer.ComposeStringC("\r\nRoom (meas_pre): ");
+  composer.MoveTo(kDebugPoint);
+  composer.MoveDown(++line);
+  composer.ComposeStringC("Room (meas_pre): ");
   composer.stream_->WriteWord(pre_meas);
 
-  composer.ComposeStringC("\r\nRoom (meas_post): ");
+  composer.MoveTo(kDebugPoint);
+  composer.MoveDown(++line);
+  composer.ComposeStringC("Room (meas_post): ");
   composer.stream_->WriteWord(post_meas);
 
   // composer.ComposeStringC("\r\nRoom (debug_post): ");
   // composer.stream_->WriteWord(post_room);
 
-  composer.ComposeStringC("\r\nDelta\r\nRoom (setup delta): ");
+  composer.MoveTo(kDebugPoint);
+  composer.MoveDown(++line);
+  composer.ComposeStringC("Room (setup delta): ");
   composer.stream_->WriteWord(room_setup_pre - room_setup_post);
   composer.ClearToEndOfLine();
 
-  composer.ComposeStringC("\r\nRoom (debug delta): ");
+  composer.MoveTo(kDebugPoint);
+  composer.MoveDown(++line);
+  composer.ComposeStringC("Room (debug delta): ");
   if (sample_room) {
     composer.stream_->WriteWord(0);
   } else {
@@ -315,11 +333,15 @@ void print_debug() {
 
   composer.ClearToEndOfLine();
 
-  composer.ComposeStringC("\r\nRoom (meas delta): ");
+  composer.MoveTo(kDebugPoint);
+  composer.MoveDown(++line);
+  composer.ComposeStringC("Room (meas delta): ");
   composer.stream_->WriteWord(pre_meas - post_meas);
   composer.ClearToEndOfLine();
 
-  composer.ComposeStringC("\r\nPC: ");
+  composer.MoveTo(kDebugPoint);
+  composer.MoveDown(++line);
+  composer.ComposeStringC("PC: ");
   composer.stream_->WriteWord(kenbakMemory[3]);
 }
 
