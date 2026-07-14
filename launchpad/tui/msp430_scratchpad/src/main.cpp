@@ -8,6 +8,8 @@
 #include "locale.h"
 
 #include <Arduino.h>
+#undef OUTPUT
+#undef INPUT
 #include <limits.h>
 #include <msp430.h>
 
@@ -125,6 +127,12 @@ uint8_t debug_task_counter;
 #define kScreenWidth 80
 #define kScreenHeight 24
 #endif
+
+struct AppView {
+  uint8_t width;
+  uint8_t height;
+};
+
 const uint8_t kTopMargin = 0;
 const uint8_t kLeftMargin = 1;
 const uint8_t kMiddleMargin = 1;
@@ -133,20 +141,18 @@ const EePoint kHomePoint = EePoint(1 /*col*/, 1 /*row*/);
 const EePoint kDebugPoint = EePoint(kScreenWidth + 10, 1 /* row */);
 const EePoint kInputPoint = EePoint(kLeftMargin + 2, kDebugPoint.row());
 
-const EePoint kNwPoint = EePoint(1, 1);
-const uint8_t kAppMemWidth = 16 * 4 + 4 + 1;
-const uint8_t kAppMemHeight = 16 + 1;
+const struct AppView kAppMemView = {16 * 4 + 4, 1 + 16};
+const struct AppView kAppControlsView = {3, 1 + 13};
+const struct AppView kAppDecodeView = {32, 3};
 
-const EePoint kNePoint = EePoint(kAppMemWidth + 1 /*col*/, 1 /*row*/);
-const uint8_t kAppControlsWidth = kScreenWidth - kAppMemWidth;
-const uint8_t kAppControlsHeight = kAppMemHeight;
+const EePoint kNwPoint = EePoint(1, 3);
+const EePoint kNePoint = EePoint(kAppControlsView.width + 2 /*col*/, 1 /*row*/);
+const EePoint kSwPoint = EePoint(1, kAppMemView.height + 1);
 
-const EePoint kSwPoint = EePoint(1 /*col*/, kAppMemHeight + 1 /*row*/);
-const uint8_t kAppSwWidth = kScreenWidth;
-const uint8_t kAppSwHeight = kScreenHeight - kAppMemHeight;
 /* end */
 
 /* Input */
+char last_input = '\0';
 CmdProcessorState cmd_state;
 const char* active_cmd;
 uint8_t cmd_idx;
@@ -165,7 +171,17 @@ int ReadCommand(uint8_t* character) {
 /* Kenbak */
 #define MEM_SIZE 256
 uint8_t kenbakMemory[MEM_SIZE];
-const uint8_t PC = 3;
+enum class KenbakReg : uint8_t {
+  A = 000,
+  B = 001,
+  X = 002,
+  PC = 003,
+  OUTPUT = 0200,
+  AOC = 0201,
+  BOC = 0202,
+  XOC = 0203,
+  INPUT = 0377,
+};
 bool redraw_memory = true;
 char* const kHbtValues[] = {"/", "\\"};
 uint8_t hbt_index = 0;
@@ -179,11 +195,19 @@ uint8_t hbt_task_counter;
 EeText hbt_text = EeText(kDebugPoint);
 /* end */
 
+void app_decode(const EeComposer& composer) {
+  composer.ComposeStringC("Decode");
+  composer.MoveLeft(6);
+  composer.MoveDown(1);
+  if (last_input > 0x20) {
+    composer.stream_->WriteChar(last_input);
+  }
+}
 void app_controls(const EeComposer& composer) {
-#define RN_CONTROL                        \
-  do {                                    \
-    composer.MoveLeft(kAppControlsWidth); \
-    composer.MoveDown(1);                 \
+#define RN_CONTROL                             \
+  do {                                         \
+    composer.MoveLeft(kAppControlsView.width); \
+    composer.MoveDown(1);                      \
   } while (0);
 
   composer.ComposeStringC("PWR");
@@ -231,7 +255,7 @@ void app_controls(const EeComposer& composer) {
 #undef RN_CONTROL
 }
 
-void app_mem(const EeComposer& composer) {
+void app_mem_draw_all(const EeComposer& composer) {
   // Example to print w/ locale change
   // composer.ComposeStringC(kTimeStrings[language]);
   // composer.stream_->Write(0x20);
@@ -243,55 +267,52 @@ void app_mem(const EeComposer& composer) {
   // }
   // composer.ClearToEndOfLine();
 
-  if (redraw_memory) {
-    {  // Write column headings
-      composer.stream_->WriteStringC("    ");
-      for (uint8_t col = 0; col < 16; col++) {
-        composer.stream_->WriteChar(' ');
-        composer.stream_->WriteOct(col);
-      }
-      composer.stream_->WriteChar('|');
-      composer.MoveLeft(kAppMemWidth);
+  {  // Write column headings
+    composer.stream_->WriteStringC("    ");
+    for (uint8_t col = 0; col < 16; col++) {
+      composer.stream_->WriteChar(' ');
+      composer.stream_->WriteOct(col);
+    }
+    // composer.stream_->WriteChar('|');
+    composer.MoveLeft(kAppMemView.width);
+    composer.MoveDown(1);
+  }
+  for (uint8_t row = 0; row < 16; row++) {
+
+    // write address
+    // composer.stream_->WriteHex(row * 0x10);
+    composer.stream_->WriteOct(row * 0x10);
+    composer.stream_->WriteChar(':');
+
+    // Write the 0xF values
+    for (uint8_t col = 0; col < 16; col++) {
+      uint8_t value = kenbakMemory[row * 0x10 + col];
+      composer.stream_->WriteChar(' ');
+      composer.stream_->WriteOct(value);
+    }
+    // composer.stream_->WriteChar('|');
+
+    {  // Moveto next row
+      // baseline
+      // composer.stream_->WriteStringC("\x1b[");
+      // composer.stream_->WriteByte(row + 2 + 1 + (kNwPoint.row() - 1));
+      // composer.stream_->WriteChar(';');
+      // composer.stream_->WriteByte(kNwPoint.col());
+      // composer.stream_->WriteChar('H');
+
+      // +8 stack
+      // composer.MoveTo(row + 2 + (kNwPoint.row() - 1), 1);
+
+      // +6 stack
+      // composer.MoveTo(kNwPoint);
+      // composer.MoveDown(row + 2);
+
+      // +4 stack
+      composer.MoveLeft(kAppMemView.width);
       composer.MoveDown(1);
     }
-    for (uint8_t row = 0; row < 16; row++) {
-
-      // write address
-      // composer.stream_->WriteHex(row * 0x10);
-      composer.stream_->WriteOct(row * 0x10);
-      composer.stream_->WriteChar(':');
-
-      // Write the 0xF values
-      for (uint8_t col = 0; col < 16; col++) {
-        uint8_t value = kenbakMemory[row * 0x10 + col];
-        composer.stream_->WriteChar(' ');
-        composer.stream_->WriteOct(value);
-      }
-      composer.stream_->WriteChar('|');
-
-      {  // Moveto next row
-        // baseline
-        // composer.stream_->WriteStringC("\x1b[");
-        // composer.stream_->WriteByte(row + 2 + 1 + (kNwPoint.row() - 1));
-        // composer.stream_->WriteChar(';');
-        // composer.stream_->WriteByte(kNwPoint.col());
-        // composer.stream_->WriteChar('H');
-
-        // +8 stack
-        // composer.MoveTo(row + 2 + (kNwPoint.row() - 1), 1);
-
-        // +6 stack
-        // composer.MoveTo(kNwPoint);
-        // composer.MoveDown(row + 2);
-
-        // +4 stack
-        composer.MoveLeft(kAppMemWidth);
-        composer.MoveDown(1);
-      }
-    }
-
-    redraw_memory = true;
   }
+  redraw_memory = false;
 }
 
 void ComposeSheet(const EeComposer& composer) {
@@ -317,18 +338,17 @@ void ComposeSheet(const EeComposer& composer) {
 
   {  // NW app
     composer.MoveTo(kNwPoint);
-    app_mem(composer);
-    // composer.MoveTo(kNwPoint);
-    // composer.MoveDown(kAppMemHeight);
-    // composer.ComposeDiv(kAppMemWidth);
+    app_controls(composer);
   }
 
-  {  // NE app
+  if (redraw_memory) {  // NE app
     composer.MoveTo(kNePoint);
-    app_controls(composer);
-    // composer.MoveTo(kNePoint);
-    // composer.MoveDown(kAppControlsHeight);
-    // composer.ComposeDiv(kAppControlsWidth);
+    app_mem_draw_all(composer);
+  }
+
+  {  // SE app
+    composer.MoveTo(kSwPoint);
+    app_decode(composer);
   }
   digitalWrite(RED_LED, false);
   compose_duration_ms = millis() - start;
@@ -342,8 +362,8 @@ void setup() {
   hbt_task_counter = HBT_TASK_PERIOD;
   debug_task_counter = DEBUG_TASK_PERIOD;
 
-  pinMode(RED_LED, OUTPUT);
-  pinMode(GREEN_LED, OUTPUT);
+  pinMode(RED_LED, 1);
+  pinMode(GREEN_LED, 1);
 
   input_text.SetText("");
 
@@ -354,12 +374,53 @@ void setup() {
 
   last_millis = millis();
   room_setup.update_post();
+  needs_redraw = true;
 }
 
-void task_hbt() {
-  kenbakMemory[PC]++;
+void task_hbt(const EeComposer& composer) {
+  {  // 42
+    // composer.MoveDown(pc / 16 + 1);
+  }
 
-  needs_redraw = true;
+  {  // 38
+    // composer.stream_->WriteStringC("\x1b[");
+    // composer.stream_->WriteByte(pc / 16 + 1);
+    // composer.stream_->WriteChar('B');
+  }
+
+  {  // 38
+    // composer.stream_->WriteChar('\x1b');
+    // composer.stream_->WriteChar('[');
+    // composer.stream_->WriteByte(pc / 16 + 1);
+    // composer.stream_->WriteChar('B');
+  }
+
+  {  // 20
+    // composer.stream_->WriteChar('\x1b');
+    // composer.stream_->WriteChar('[');
+    // composer.stream_->WriteChar('1');
+    // composer.stream_->WriteChar('B');
+  }
+
+  {  // 20
+    // composer.stream_->WriteChar('B');
+  }
+
+  const uint8_t pc = static_cast<uint8_t>(KenbakReg::PC);
+  kenbakMemory[pc]++;
+  composer.MoveTo(kNePoint);
+  composer.MoveDown(pc / 16 + 1);
+  composer.MoveRight(4 + 4 * pc + 1);
+  composer.stream_->WriteOct(kenbakMemory[pc]);
+
+  // const uint8_t output = 0377;
+  // kenbakMemory[output] += 2;
+  // composer.MoveTo(kNePoint);
+  // composer.MoveDown(output / 16 + 1);
+  // composer.MoveRight(4 + 4 * (0337 & 0xf) + 1);
+  // composer.stream_->WriteOct(kenbakMemory[output]);
+
+  // needs_redraw = true;
 }
 
 uint16_t ms_since_last_check(uint16_t* last_millis) {
@@ -382,6 +443,13 @@ void loop() {
   delay(1);
 
   uptime_ms += ms_since_last_check(&last_millis);  //not it
+  if (console_uart.Available()) {
+    last_input = console_uart.ReadByte();
+    needs_redraw = true;
+    if (last_input == 'r') {
+      redraw_memory = true;
+    }
+  }
 
   // removing did +4 to room
   // if (console_uart.Available()) {
@@ -478,7 +546,7 @@ void loop() {
 
   if (hbt_task_counter-- == 1) {
     room_hbt.update_pre();
-    task_hbt();
+    task_hbt(_composer);
     room_hbt.update_post();
     hbt_task_counter = HBT_TASK_PERIOD;
   }
