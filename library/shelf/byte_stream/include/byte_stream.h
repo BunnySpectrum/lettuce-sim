@@ -45,4 +45,10 @@ class ByteStream {
     WriteChar(kNibbleToHex[(value & 0xF0) >> 4]);
     WriteChar(kNibbleToHex[value & 0xF]);
   }
+
+  virtual size_t WriteOct(uint8_t value) const {
+    WriteChar('0' + ((value & 0700) >> 6));
+    WriteChar('0' + ((value & 0070) >> 3));
+    WriteChar('0' + (value & 0007));
+  }
 };

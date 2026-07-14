@@ -104,11 +104,29 @@ void EeComposer::ComposeBar(bool is_top, uint8_t len) const
 void EeComposer::ComposeDiv(uint8_t len) const
 {
 
-  stream_->WriteChar('|');
-  stream_->WriteStringC("-\x1b[");
-  stream_->WriteByte(len - 3);
-  stream_->WriteChar(0x62);
-  stream_->WriteChar('|');
+  if (len > 3)
+  {
+    stream_->WriteChar('|');
+    stream_->WriteStringC("-\x1b[");
+    stream_->WriteByte(len - 3);
+    stream_->WriteChar(0x62);
+    stream_->WriteChar('|');
+  }
+  else
+  {
+    switch (len)
+    {
+    case 3:
+      stream_->WriteStringC("|-|");
+      break;
+    case 2:
+      stream_->WriteStringC("||");
+      break;
+    case 1:
+      stream_->WriteChar('|');
+      break;
+    }
+  }
 }
 
 void EeComposer::ComposeStringC(const char *text) const
