@@ -1,5 +1,6 @@
 #include "arduino/byte_stream_arduino.h"
 #include "cmd_processor.h"
+#include "cpu.h"
 #include "ee_composer.h"
 #include "ee_frame.h"
 #include "ee_message.h"
@@ -185,19 +186,23 @@ enum class KenbakReg : uint8_t {
 bool redraw_memory = true;
 char* const kHbtValues[] = {"/", "\\"};
 uint8_t hbt_index = 0;
+Kenbak cpuState;
 
 // How many ticks (today, 1tick = 1ms) until we run
 //  >1 = decrement each tick
 //  1 = ready to run
 //  0 = do not update counter each tick
-#define HBT_TASK_PERIOD 200
-uint8_t hbt_task_counter;
+#define CPU_TASK_PERIOD 200
+uint8_t cpu_task_counter;
 EeText hbt_text = EeText(kDebugPoint);
 /* end */
 
 void app_decode(const EeComposer& composer) {
-  composer.ComposeStringC("Decode");
-  composer.MoveLeft(6);
+  composer.ComposeStringC("Decode: (");
+  composer.stream_->WriteOct(cpuState.cursor_address());
+  composer.ComposeStringC("): ");
+  composer.stream_->WriteOct(kenbakMemory[cpuState.cursor_address()]);
+  composer.MoveLeft(9 + 3 + 3 + 3);
   composer.MoveDown(1);
   if (last_input > 0x20) {
     composer.stream_->WriteChar(last_input);
@@ -359,7 +364,7 @@ void setup() {
   room_setup.update_pre();
   console_uart.Configure(115200);  // -38 to room
 
-  hbt_task_counter = HBT_TASK_PERIOD;
+  cpu_task_counter = CPU_TASK_PERIOD;
   debug_task_counter = DEBUG_TASK_PERIOD;
 
   pinMode(RED_LED, 1);
@@ -377,7 +382,14 @@ void setup() {
   needs_redraw = true;
 }
 
-void task_hbt(const EeComposer& composer) {
+void cpu_update_addr(uint8_t addr) {
+  _composer.MoveTo(kNePoint);
+  _composer.MoveDown(addr / 16 + 1);
+  _composer.MoveRight(4 + 4 * addr + 1);
+  _composer.stream_->WriteOct(kenbakMemory[addr]);
+}
+
+void task_cpu(const EeComposer& composer) {
   {  // 42
     // composer.MoveDown(pc / 16 + 1);
   }
@@ -406,12 +418,11 @@ void task_hbt(const EeComposer& composer) {
     // composer.stream_->WriteChar('B');
   }
 
-  const uint8_t pc = static_cast<uint8_t>(KenbakReg::PC);
-  kenbakMemory[pc]++;
-  composer.MoveTo(kNePoint);
-  composer.MoveDown(pc / 16 + 1);
-  composer.MoveRight(4 + 4 * pc + 1);
-  composer.stream_->WriteOct(kenbakMemory[pc]);
+  if (cpuState.step()) {
+    const uint8_t pc = static_cast<uint8_t>(KenbakReg::PC);
+    kenbakMemory[pc]++;
+    cpu_update_addr(pc);
+  }
 
   // const uint8_t output = 0377;
   // kenbakMemory[output] += 2;
@@ -446,8 +457,31 @@ void loop() {
   if (console_uart.Available()) {
     last_input = console_uart.ReadByte();
     needs_redraw = true;
-    if (last_input == 'r') {
-      redraw_memory = true;
+    switch (last_input) {
+      case 'r':
+        redraw_memory = true;
+        break;
+      case 'g':
+        cpuState.toggle_step();
+        break;
+      case 's':
+      case 'j':
+        cpuState.move_cursor_address(16);
+        break;
+      case 'w':
+      case 'k':
+        cpuState.move_cursor_address(-16);
+        break;
+      case 'a':
+      case 'h':
+        cpuState.move_cursor_address(-1);
+        break;
+      case 'd':
+      case 'l':
+        cpuState.move_cursor_address(1);
+        break;
+      default:
+        break;
     }
   }
 
@@ -544,11 +578,11 @@ void loop() {
   //   prev_language = language;
   // }
 
-  if (hbt_task_counter-- == 1) {
+  if (cpu_task_counter-- == 1) {
     room_hbt.update_pre();
-    task_hbt(_composer);
+    task_cpu(_composer);
     room_hbt.update_post();
-    hbt_task_counter = HBT_TASK_PERIOD;
+    cpu_task_counter = CPU_TASK_PERIOD;
   }
 
   if (needs_redraw) {
