@@ -129,9 +129,9 @@ void EeComposer::ComposeDiv(uint8_t len) const
   }
 }
 
-void EeComposer::ComposeStringC(const char *text) const
+size_t EeComposer::ComposeStringC(const char *text) const
 {
-  stream_->WriteStringC(text);
+  return stream_->WriteStringC(text);
 }
 #undef ESC
 #undef CSI

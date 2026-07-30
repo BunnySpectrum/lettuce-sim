@@ -112,7 +112,7 @@ uint32_t uptime_ms = 0;
 uint16_t compose_duration_ms = 0;
 uint8_t debug_state = 0;
 uint8_t input_count = 0;
-bool needs_redraw = false;
+bool debug_enabled = true;
 void print_debug(const EeComposer& composer);
 uint8_t debug_task_counter;
 #define DEBUG_TASK_PERIOD 200
@@ -170,20 +170,11 @@ int ReadCommand(uint8_t* character) {
 /* end */
 
 /* Kenbak */
-#define MEM_SIZE 256
-uint8_t kenbakMemory[MEM_SIZE];
-enum class KenbakReg : uint8_t {
-  A = 000,
-  B = 001,
-  X = 002,
-  PC = 003,
-  OUTPUT = 0200,
-  AOC = 0201,
-  BOC = 0202,
-  XOC = 0203,
-  INPUT = 0377,
-};
 bool redraw_memory = true;
+bool redraw_decode = true;
+bool needs_redraw() {
+  return redraw_decode || redraw_memory;
+}
 char* const kHbtValues[] = {"/", "\\"};
 uint8_t hbt_index = 0;
 Kenbak cpuState;
@@ -198,15 +189,28 @@ EeText hbt_text = EeText(kDebugPoint);
 /* end */
 
 void app_decode(const EeComposer& composer) {
-  composer.ComposeStringC("Decode: (");
-  composer.stream_->WriteOct(cpuState.cursor_address());
-  composer.ComposeStringC("): ");
-  composer.stream_->WriteOct(kenbakMemory[cpuState.cursor_address()]);
-  composer.MoveLeft(9 + 3 + 3 + 3);
+  auto cursorData = cpuState.memory_read(cpuState.cursor_address());
+  size_t wrote = 0;
+  wrote += composer.ComposeStringC("Decode: (");
+  wrote += composer.stream_->WriteOct(cpuState.cursor_address());
+  wrote += composer.ComposeStringC("): ");
+  wrote += composer.stream_->WriteOct(cursorData);
+
   composer.MoveDown(1);
-  if (last_input > 0x20) {
-    composer.stream_->WriteChar(last_input);
+  composer.MoveLeft(wrote);
+  wrote = 0;
+  if (is_add_sub_load_store(cursorData)) {
+    composer.ComposeStringC("AddSubLoadStore.");
+  } else {
+    wrote += composer.ComposeStringC("???");
+    composer.ClearChars(kAppDecodeView.width - wrote);
   }
+
+  // composer.MoveLeft(9 + 3 + 3 + 3);
+  // composer.MoveDown(1);
+  // if (last_input > 0x20) {
+  //   composer.stream_->WriteChar(last_input);
+  // }
 }
 void app_controls(const EeComposer& composer) {
 #define RN_CONTROL                             \
@@ -291,8 +295,9 @@ void app_mem_draw_all(const EeComposer& composer) {
 
     // Write the 0xF values
     for (uint8_t col = 0; col < 16; col++) {
-      uint8_t value = kenbakMemory[row * 0x10 + col];
-      composer.stream_->WriteChar(' ');
+      uint8_t value = cpuState.memory_read(row * 0x10 + col);
+      // composer.stream_->WriteChar(' ');
+      composer.MoveRight(1);
       composer.stream_->WriteOct(value);
     }
     // composer.stream_->WriteChar('|');
@@ -317,7 +322,6 @@ void app_mem_draw_all(const EeComposer& composer) {
       composer.MoveDown(1);
     }
   }
-  redraw_memory = false;
 }
 
 void ComposeSheet(const EeComposer& composer) {
@@ -349,16 +353,40 @@ void ComposeSheet(const EeComposer& composer) {
   if (redraw_memory) {  // NE app
     composer.MoveTo(kNePoint);
     app_mem_draw_all(composer);
+    redraw_memory = false;
   }
 
-  {  // SE app
+  if (redraw_decode) {  // SE app
     composer.MoveTo(kSwPoint);
     app_decode(composer);
+    redraw_decode = false;
   }
   digitalWrite(RED_LED, false);
   compose_duration_ms = millis() - start;
 }
 
+void mem_view_update_addr(uint8_t addr) {
+  _composer.MoveTo(kNePoint);
+  _composer.MoveDown(addr / 16 + 1);
+  _composer.MoveRight(4 + 4 * (addr & 0xf) + 1);
+  _composer.stream_->WriteOct(cpuState.memory_read(addr));
+}
+void mem_view_cursor_set(uint8_t addr) {
+  _composer.MoveTo(kNePoint);
+  _composer.MoveDown(addr / 16 + 1);
+  _composer.MoveRight(4 + 4 * (addr & 0xF));
+  _composer.stream_->WriteChar('>');
+  // _composer.MoveRight(3);
+  // _composer.stream_->WriteChar(')');
+}
+void mem_view_cursor_clear(uint8_t addr) {
+  _composer.MoveTo(kNePoint);
+  _composer.MoveDown(addr / 16 + 1);
+  _composer.MoveRight(4 + 4 * (addr & 0xf));
+  _composer.stream_->WriteChar(' ');
+  // _composer.MoveRight(3);
+  // _composer.stream_->WriteChar(' ');
+}
 void setup() {
   paint_stack();
   room_setup.update_pre();
@@ -379,14 +407,7 @@ void setup() {
 
   last_millis = millis();
   room_setup.update_post();
-  needs_redraw = true;
-}
-
-void cpu_update_addr(uint8_t addr) {
-  _composer.MoveTo(kNePoint);
-  _composer.MoveDown(addr / 16 + 1);
-  _composer.MoveRight(4 + 4 * addr + 1);
-  _composer.stream_->WriteOct(kenbakMemory[addr]);
+  mem_view_cursor_set(cpuState.cursor_address());
 }
 
 void task_cpu(const EeComposer& composer) {
@@ -419,9 +440,9 @@ void task_cpu(const EeComposer& composer) {
   }
 
   if (cpuState.step()) {
-    const uint8_t pc = static_cast<uint8_t>(KenbakReg::PC);
-    kenbakMemory[pc]++;
-    cpu_update_addr(pc);
+    cpuState.execute();
+    mem_view_update_addr(static_cast<uint8_t>(KenbakReg::PC));
+    redraw_decode = true;
   }
 
   // const uint8_t output = 0377;
@@ -456,29 +477,45 @@ void loop() {
   uptime_ms += ms_since_last_check(&last_millis);  //not it
   if (console_uart.Available()) {
     last_input = console_uart.ReadByte();
-    needs_redraw = true;
     switch (last_input) {
       case 'r':
         redraw_memory = true;
+        redraw_decode = true;
+        mem_view_cursor_set(cpuState.cursor_address());
         break;
       case 'g':
         cpuState.toggle_step();
         break;
       case 's':
-      case 'j':
+        // case 'j':
+        mem_view_cursor_clear(cpuState.cursor_address());
         cpuState.move_cursor_address(16);
+        mem_view_cursor_set(cpuState.cursor_address());
+        redraw_decode = true;
         break;
       case 'w':
-      case 'k':
+        // case 'k':
+        mem_view_cursor_clear(cpuState.cursor_address());
         cpuState.move_cursor_address(-16);
+        mem_view_cursor_set(cpuState.cursor_address());
+        redraw_decode = true;
         break;
       case 'a':
-      case 'h':
+        // case 'h':
+        mem_view_cursor_clear(cpuState.cursor_address());
         cpuState.move_cursor_address(-1);
+        mem_view_cursor_set(cpuState.cursor_address());
+        redraw_decode = true;
         break;
       case 'd':
-      case 'l':
+        // case 'l':
+        mem_view_cursor_clear(cpuState.cursor_address());
         cpuState.move_cursor_address(1);
+        mem_view_cursor_set(cpuState.cursor_address());
+        redraw_decode = true;
+        break;
+      case '1':
+        debug_enabled ^= true;
         break;
       default:
         break;
@@ -585,14 +622,12 @@ void loop() {
     cpu_task_counter = CPU_TASK_PERIOD;
   }
 
-  if (needs_redraw) {
+  if (needs_redraw()) {
     _composer.ShowCursor(false);  // if host clears the terminal, we need to re-send
 
     room_compose.update_pre();
     ComposeSheet(_composer);
     room_compose.update_post();
-
-    needs_redraw = false;
   }
 
   if (debug_task_counter-- == 1) {
@@ -603,6 +638,9 @@ void loop() {
   }
 }
 void print_debug(const EeComposer& composer) {
+  if (!debug_enabled) {
+    return;
+  }
   hbt_index++;
   hbt_index %= sizeof(kHbtValues) / sizeof(char*);
   hbt_text.SetText(kHbtValues[hbt_index]);
