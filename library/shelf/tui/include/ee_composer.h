@@ -19,11 +19,8 @@ public:
   void ClearToEndOfLine() const;
   void ShowCursor(bool show) const;
 
-  void ComposeDiv(uint8_t len) const;
-  void ComposeBar(bool is_top, uint8_t len) const;
   size_t ComposeStringC(const char *text) const;
 
-  void SetContext(EePoint origin, uint8_t col_count, uint8_t row_count);
 
   //  private:
   const ByteStream *stream_;

@@ -11,6 +11,12 @@ class Register(enum.Enum):
     def c_name(self) -> str:
         return self.name[1:]
 
+class RegisterShiftRotate(enum.Enum):
+    kA = 0
+    kB = 4
+
+    def c_name(self) -> str:
+        return self.name[1:]
 
 class Addressing(enum.Enum):
     kConstant = 3
@@ -212,6 +218,45 @@ class OpGroupJump(ABC):
     def c_name(cls) -> str:
         pass
 
+class OpJumpDirect(OpGroupJump):
+    @classmethod
+    def opcode(cls) -> int:
+        return 4
+
+    @classmethod
+    def c_name(cls) -> str:
+        return "JPD"
+
+
+class OpJumpIndirect(OpGroupJump):
+    @classmethod
+    def opcode(cls) -> int:
+        return 5
+
+    @classmethod
+    def c_name(cls) -> str:
+        return "JPI"
+
+
+class OpJumpMarkDirect(OpGroupJump):
+    @classmethod
+    def opcode(cls) -> int:
+        return 6
+
+    @classmethod
+    def c_name(cls) -> str:
+        return "JMD"
+
+
+class OpJumpMarkIndirect(OpGroupJump):
+    @classmethod
+    def opcode(cls) -> int:
+        return 7
+
+    @classmethod
+    def c_name(cls) -> str:
+        return "JMI"
+
 
 class OpGroupBits(ABC):
     def __init__(self, digit: int):
@@ -278,46 +323,113 @@ class OpSkipOn1(OpGroupBits):
     def c_name(cls) -> str:
         return "SkipOn1"
 
+class OpGroupShiftRotate(ABC):
+    @classmethod
+    def valid_places(cls) -> list[int]:
+        return [1,2,3,4]
 
-class OpJumpDirect(OpGroupJump):
+    def __init__(self, register: RegisterShiftRotate, places: int):
+        if places not in self.valid_places():
+            raise ValueError(places)
+
+        self._register = register
+        self._places = places
+
+    def to_code(self) -> list[int]:
+        if self._places != 4:
+            place_code = self._places
+        else:
+            place_code = 0
+        code = OctalByte(0)
+        code.set_high(self.opcode())
+        code.set_mid(self._register.value + place_code)
+        code.set_low(1)
+
+        return [code.value()]
+
+    @classmethod
+    @abstractmethod
+    def opcode(cls) -> int:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def c_name(cls) -> str:
+        pass
+
+
+class OpRightShift(OpGroupShiftRotate):
     @classmethod
     def opcode(cls) -> int:
-        return 4
+        return 0
 
     @classmethod
     def c_name(cls) -> str:
-        return "JPD"
+        return "Right shift"
 
-
-class OpJumpIndirect(OpGroupJump):
+class OpRightRotate(OpGroupShiftRotate):
     @classmethod
     def opcode(cls) -> int:
-        return 5
+        return 1
 
     @classmethod
     def c_name(cls) -> str:
-        return "JPI"
+        return "Right rotate"
 
-
-class OpJumpMarkDirect(OpGroupJump):
+class OpLeftShift(OpGroupShiftRotate):
     @classmethod
     def opcode(cls) -> int:
-        return 6
+        return 2
 
     @classmethod
     def c_name(cls) -> str:
-        return "JMD"
+        return "Left shift"
 
-
-class OpJumpMarkIndirect(OpGroupJump):
+class OpLeftRotate(OpGroupShiftRotate):
     @classmethod
     def opcode(cls) -> int:
-        return 7
+        return 3
 
     @classmethod
     def c_name(cls) -> str:
-        return "JMI"
+        return "Left rotate"
 
+class OpGroupMisc(ABC):
+    def to_code(self) -> list[int]:
+        code = OctalByte(0)
+        code.set_high(self.opcode())
+        code.set_mid(0)
+        code.set_low(0)
+
+        return [code.value()]
+
+    @classmethod
+    @abstractmethod
+    def opcode(cls) -> int:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def c_name(cls) -> str:
+        pass
+
+class OpHalt(OpGroupMisc):
+    @classmethod
+    def opcode(cls) -> int:
+        return 0
+
+    @classmethod
+    def c_name(cls) -> str:
+        return "Halt"
+
+class OpNoop(OpGroupMisc):
+    @classmethod
+    def opcode(cls) -> int:
+        return 2
+
+    @classmethod
+    def c_name(cls) -> str:
+        return "Noop"
 
 leader = " " * 4
 # mem_addr = 0o20
@@ -349,17 +461,44 @@ leader = " " * 4
 #     else:
 #         print("")
 
-mem_addr = 0o133
-for op_class in [OpJumpDirect, OpJumpIndirect, OpJumpMarkDirect, OpJumpMarkIndirect]:
-    for check in list(JumpCheck):
-        print(f"{leader}// {op_class.c_name()} {check.c_name()}")
-        for condition in list(JumpCondition):
-            opcode = op_class(check=check, condition=condition)
-            code = opcode.to_code()[0]
+# mem_addr = 0o133
+# for op_class in [OpJumpDirect, OpJumpIndirect, OpJumpMarkDirect, OpJumpMarkIndirect]:
+#     for check in list(JumpCheck):
+#         print(f"{leader}// {op_class.c_name()} {check.c_name()}")
+#         for condition in list(JumpCondition):
+#             opcode = op_class(check=check, condition=condition)
+#             code = opcode.to_code()[0]
 
-            print(
-                f"{leader}memory[{mem_addr:0>4o}] = {code:0>4o};  // {condition.c_name()}"
-            )
-            mem_addr += 1
-        else:
-            print("")
+#             print(
+#                 f"{leader}memory[{mem_addr:0>4o}] = {code:0>4o};  // {condition.c_name()}"
+#             )
+#             mem_addr += 1
+#         else:
+#             print("")
+
+# mem_addr = 0o253
+# for op_class in [OpRightShift, OpRightRotate, OpLeftShift, OpLeftRotate]:
+#     for register in list(RegisterShiftRotate):
+#         print(f"{leader}// {op_class.c_name()} {register.c_name()}")
+#         for places in OpGroupShiftRotate.valid_places():
+#             opcode = op_class(register=register, places=places)
+#             code = opcode.to_code()[0]
+
+#             print(
+#                 f"{leader}memory[{mem_addr:0>4o}] = {code:0>4o};  // {places}"
+#             )
+#             mem_addr += 1
+#         else:
+#             print("")
+
+mem_addr = 0o313
+for op_class in [OpHalt, OpNoop]:
+    print(f"{leader}// {op_class.c_name()}")
+    opcode = op_class()
+    code = opcode.to_code()[0]
+
+    print(
+        f"{leader}memory[{mem_addr:0>4o}] = {code:0>4o};"
+    )
+    mem_addr += 1
+    print("\n")

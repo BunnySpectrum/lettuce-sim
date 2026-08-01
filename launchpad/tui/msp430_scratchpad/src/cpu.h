@@ -1,3 +1,5 @@
+#ifndef CPU_H
+#define CPU_H
 #include <stdint.h>
 #undef OUTPUT
 #undef INPUT
@@ -26,9 +28,6 @@ enum class CodeGroup : uint8_t {
   kShiftRotate,
   kMisc,
 };
-bool is_add_sub_load_store(uint8_t value) {
-  return ((value & 0007) > 0002) && ((value & 0070) < 0040) && ((value & 0700) < 0300);
-}
 
 enum class KenbakReg : uint8_t {
   A = 000,
@@ -270,7 +269,65 @@ class Kenbak {
     memory[0250] = 0375;  // LessThanZero
     memory[0251] = 0376;  // GreaterEqualZero
     memory[0252] = 0377;  // GreaterThanZero
+
+        // Right shift A
+    memory[0253] = 0011;  // 1
+    memory[0254] = 0021;  // 2
+    memory[0255] = 0031;  // 3
+    memory[0256] = 0001;  // 4
+
+    // Right shift B
+    memory[0257] = 0051;  // 1
+    memory[0260] = 0061;  // 2
+    memory[0261] = 0071;  // 3
+    memory[0262] = 0041;  // 4
+
+    // Right rotate A
+    memory[0263] = 0111;  // 1
+    memory[0264] = 0121;  // 2
+    memory[0265] = 0131;  // 3
+    memory[0266] = 0101;  // 4
+
+    // Right rotate B
+    memory[0267] = 0151;  // 1
+    memory[0270] = 0161;  // 2
+    memory[0271] = 0171;  // 3
+    memory[0272] = 0141;  // 4
+
+    // Left shift A
+    memory[0273] = 0211;  // 1
+    memory[0274] = 0221;  // 2
+    memory[0275] = 0231;  // 3
+    memory[0276] = 0201;  // 4
+
+    // Left shift B
+    memory[0277] = 0251;  // 1
+    memory[0300] = 0261;  // 2
+    memory[0301] = 0271;  // 3
+    memory[0302] = 0241;  // 4
+
+    // Left rotate A
+    memory[0303] = 0311;  // 1
+    memory[0304] = 0321;  // 2
+    memory[0305] = 0331;  // 3
+    memory[0306] = 0301;  // 4
+
+    // Left rotate B
+    memory[0307] = 0351;  // 1
+    memory[0310] = 0361;  // 2
+    memory[0311] = 0371;  // 3
+    memory[0312] = 0341;  // 4
+
+    // Halt
+    memory[0313] = 0000;
+
+    // Noop
+    memory[0314] = 0200;
   }
+
+ static bool is_add_sub_load_store(uint8_t value) {
+  return ((value & 0007) > 0002) && ((value & 0070) < 0040) && ((value & 0700) < 0300);
+}
 
   void toggle_step() { step_ ^= true; }
   void move_cursor_address(int16_t amount) { cursorAddress_ += amount; }
@@ -291,3 +348,4 @@ class Kenbak {
   bool step_;
 };
 #undef MEM_SIZE
+#endif
