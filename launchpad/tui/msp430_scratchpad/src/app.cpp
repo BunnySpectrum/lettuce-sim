@@ -1,5 +1,16 @@
 #include "app.h"
 
+const EePoint kNwPoint = EePoint(1, 3);
+// const struct AppView kAppControlsView = {kNwPoint, 3, 1 + 13};
+const struct AppView kAppControlsView = {3, 1 + 13};
+
+const EePoint kNePoint = EePoint(kAppControlsView.width + 2 /*col*/, 1 /*row*/);
+// const struct AppView kAppMemView = {kNePoint, 16 * 4 + 4, 1 + 16};
+const struct AppView kAppMemView = {16 * 4 + 4, 1 + 16};
+
+const EePoint kSwPoint = EePoint(1, kAppMemView.height + 1);
+// const struct AppView kAppDecodeView = {kSwPoint, 32, 3};
+const struct AppView kAppDecodeView = {32, 3};
 
 // void App::app_decode(const Kenbak& cpuState) {
 void App::app_decode(const Kenbak& cpuState, const EeComposer& composer_) {

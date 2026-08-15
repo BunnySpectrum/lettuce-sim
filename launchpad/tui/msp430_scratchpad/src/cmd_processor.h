@@ -1,3 +1,6 @@
+#ifndef CMD_PROCESSOR_H
+#define CMD_PROCESSOR_H
+#include <stdint.h>
 
 enum CmdProcessorState {
   kReady = 0,  // ready for new command
@@ -6,8 +9,10 @@ enum CmdProcessorState {
   kDone,       // done receiving for this command
 };
 
-const char* const kCmdHelp = "help";
-const char* const kCmdLangEn = "en";
-const char* const kCmdLangRu = "ru";
-char const kSetLangEn[] = "e";
-char const kSetLangRu[] = "r";
+enum class Command : uint8_t {
+  kUnknown,
+  kHelp,
+  kLanguage,
+};
+
+#endif

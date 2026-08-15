@@ -1,5 +1,10 @@
 #include "stack.h"
 
+const unsigned int stack_end = (unsigned int)__noinit_end;
+const unsigned int kRamUsed = stack_end - (unsigned int)__data_start;
+const unsigned int kFlashUsed =
+    ((unsigned int)_etext - kRomOrigin) + (unsigned int)__data_size + kVectorSize;
+
 struct StackRoom room_setup, room_hbt, room_debug, room_compose;
 
 void paint_stack() {

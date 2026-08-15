@@ -6,17 +6,14 @@
 #include "cpu.h"
 #include "view.h"
 
-const EePoint kNwPoint = EePoint(1, 3);
-// const struct AppView kAppControlsView = {kNwPoint, 3, 1 + 13};
-const struct AppView kAppControlsView = {3, 1 + 13};
+extern const EePoint kNwPoint;
+extern const struct AppView kAppControlsView;
 
-const EePoint kNePoint = EePoint(kAppControlsView.width + 2 /*col*/, 1 /*row*/);
-// const struct AppView kAppMemView = {kNePoint, 16 * 4 + 4, 1 + 16};
-const struct AppView kAppMemView = {16 * 4 + 4, 1 + 16};
+extern const EePoint kNePoint;
+extern const struct AppView kAppMemView;
 
-const EePoint kSwPoint = EePoint(1, kAppMemView.height + 1);
-// const struct AppView kAppDecodeView = {kSwPoint, 32, 3};
-const struct AppView kAppDecodeView = {32, 3};
+extern const EePoint kSwPoint;
+extern const struct AppView kAppDecodeView;
 
 class App{
     public:
