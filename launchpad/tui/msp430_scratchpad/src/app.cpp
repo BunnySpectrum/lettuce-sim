@@ -57,7 +57,7 @@ void App::app_controls(const EeComposer& composer_) {
     }
 
     // composer_.MoveTo(kAppControlsView.origin);
-    composer_.MoveTo(kNePoint);
+    composer_.MoveTo(kNwPoint);
 #define RN_CONTROL                             \
   do {                                         \
     composer_.MoveLeft(kAppControlsView.width); \
@@ -118,7 +118,7 @@ void App::app_mem_draw_all(const Kenbak& cpuState, const EeComposer& composer_) 
         update_memory = false;
     }
     // composer_.MoveTo(kAppMemView.origin);
-    composer_.MoveTo(kNwPoint);
+    composer_.MoveTo(kNePoint);
   // Example to print w/ locale change
   // composer_.ComposeStringC(kTimeStrings[language]);
   // composer_.stream_->Write(0x20);
