@@ -5,7 +5,7 @@
 
 #define STACK_PAINT_COLOR 0xAC1D
 
-// see .platformio/packages/toolchain-timsp430/msp430/lib/ldscripts/msp430.xbn
+// see .platformio/packages/toolchain-timsp430/msp430/lib/ldscripts/msp430.x
 // Ram goes data, bss, noinit
 extern unsigned char __data_start[];  // start of RAM
 extern unsigned char __noinit_end[];

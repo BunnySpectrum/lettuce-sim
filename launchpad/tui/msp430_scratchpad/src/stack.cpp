@@ -6,12 +6,15 @@ const unsigned int kFlashUsed =
     ((unsigned int)_etext - kRomOrigin) + (unsigned int)__data_size + kVectorSize;
 
 struct StackRoom room_setup, room_hbt, room_debug, room_compose;
+namespace {
+  constexpr size_t kStackWordSize = sizeof(unsigned int);
+}
 
 void paint_stack() {
   volatile unsigned int sp;
   __asm__("MOV R1, %0" : "=r"(sp));
   unsigned int idx;
-  for (idx = sp; idx > stack_end; idx -= 2) {
+  for (idx = sp - kStackWordSize; idx > stack_end; idx -= kStackWordSize) {
     *((unsigned int*)idx) = STACK_PAINT_COLOR;
   }
 }
@@ -22,7 +25,7 @@ int task_update_room() {
   int result;
   volatile unsigned int sp;
   __asm__("MOV R1, %0" : "=r"(sp));
-  for (idx = sp; idx > stack_end; idx -= 2) {
+  for (idx = sp - kStackWordSize; idx > stack_end; idx -= kStackWordSize) {
     if (*((unsigned int*)idx) == STACK_PAINT_COLOR) {
       if (!found) {
         result = idx;

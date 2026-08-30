@@ -34,12 +34,16 @@ void App::app_decode(const Kenbak& cpuState, const EeComposer& composer_) {
   composer_.MoveDown(1);
   composer_.MoveLeft(wrote);
   wrote = 0;
-  if (Kenbak::is_add_sub_load_store(cursorData)) {
-    composer_.ComposeStringC("AddSubLoadStore.");
-  } else {
-    wrote += composer_.ComposeStringC("???");
-    composer_.ClearChars(kAppDecodeView.width - wrote);
+  const Operation kOperation = Kenbak::decode_operation(cursorData);
+  wrote += composer_.ComposeStringC(kOperationNames[static_cast<uint8_t>(kOperation)]);
+
+  CodeAddressing addressing;
+  if(Kenbak::decode_addressing(cursorData, &addressing)){
+    wrote += composer_.ComposeStringC(":");
+    wrote += composer_.ComposeStringC(kAddressingNames[static_cast<uint8_t>(addressing) - static_cast<uint8_t>(CodeAddressing::kBegin)]);
   }
+
+  composer_.ClearChars(kAppDecodeView.width - wrote); 
 
   // composer.MoveLeft(9 + 3 + 3 + 3);
   // composer.MoveDown(1);
