@@ -4,11 +4,10 @@
 
 class EePoint {
  public:
-  EePoint(uint8_t col, uint8_t row);
-  EePoint(const EePoint& other);
+  constexpr EePoint(uint8_t col, uint8_t row) : col_(col), row_(row) {}
   EePoint operator+(const EePoint& other) const;
-  uint8_t row() const { return row_; }
-  uint8_t col() const { return col_; }
+  constexpr uint8_t row() const { return row_; }
+  constexpr uint8_t col() const { return col_; }
 
  private:
   uint8_t col_;

@@ -6,15 +6,6 @@
 #include "cpu.h"
 #include "view.h"
 
-extern const EePoint kNwPoint;
-extern const struct AppView kAppControlsView;
-
-extern const EePoint kNePoint;
-extern const struct AppView kAppMemView;
-
-extern const EePoint kSwPoint;
-extern const struct AppView kAppDecodeView;
-
 class App{
     public:
     // App(const EeComposer& composer) : composer_(composer){

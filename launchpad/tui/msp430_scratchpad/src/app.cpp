@@ -1,16 +1,16 @@
 #include "app.h"
 
-const EePoint kNwPoint = EePoint(1, 3);
+constexpr EePoint kNwPoint = EePoint(1, 3);
 // const struct AppView kAppControlsView = {kNwPoint, 3, 1 + 13};
-const struct AppView kAppControlsView = {3, 1 + 13};
+constexpr struct AppView kAppControlsView = {3, 1 + 13};
 
-const EePoint kNePoint = EePoint(kAppControlsView.width + 2 /*col*/, 1 /*row*/);
+constexpr EePoint kNePoint = EePoint(kAppControlsView.width + 2 /*col*/, 1 /*row*/);
 // const struct AppView kAppMemView = {kNePoint, 16 * 4 + 4, 1 + 16};
-const struct AppView kAppMemView = {16 * 4 + 4, 1 + 16};
+constexpr struct AppView kAppMemView = {16 * 4 + 4, 1 + 16};
 
-const EePoint kSwPoint = EePoint(1, kAppMemView.height + 1);
+constexpr EePoint kSwPoint = EePoint(1, kAppMemView.height + 1);
 // const struct AppView kAppDecodeView = {kSwPoint, 32, 3};
-const struct AppView kAppDecodeView = {32, 3};
+constexpr struct AppView kAppDecodeView = {32, 3};
 
 // void App::app_decode(const Kenbak& cpuState) {
 void App::app_decode(const Kenbak& cpuState, const EeComposer& composer_) {
@@ -21,8 +21,7 @@ void App::app_decode(const Kenbak& cpuState, const EeComposer& composer_) {
         update_decode = false;
     }
 
-    // composer_.MoveTo(kAppDecodeView.origin);
-    composer_.MoveTo(kSwPoint);
+    composer_.MoveTo(kSwPoint.row(), kSwPoint.col());
 
   auto cursorData = cpuState.memory_read(cpuState.cursor_address());
   auto cursorDataNext = cpuState.memory_read(cpuState.cursor_address() + 1);
@@ -90,8 +89,7 @@ void App::app_controls(const EeComposer& composer_) {
         update_controls = false;
     }
 
-    // composer_.MoveTo(kAppControlsView.origin);
-    composer_.MoveTo(kNwPoint);
+    composer_.MoveTo(kNwPoint.row(), kNwPoint.col());
 #define RN_CONTROL                             \
   do {                                         \
     composer_.MoveLeft(kAppControlsView.width); \
@@ -151,8 +149,7 @@ void App::app_mem_draw_all(const Kenbak& cpuState, const EeComposer& composer_) 
     }else{
         update_memory = false;
     }
-    // composer_.MoveTo(kAppMemView.origin);
-    composer_.MoveTo(kNePoint);
+    composer_.MoveTo(kNePoint.row(), kNePoint.col());
   // Example to print w/ locale change
   // composer_.ComposeStringC(kTimeStrings[language]);
   // composer_.stream_->Write(0x20);
@@ -215,7 +212,7 @@ void App::app_mem_draw_all(const Kenbak& cpuState, const EeComposer& composer_) 
 // void App::mem_view_update_addr(const Kenbak& cpuState, uint8_t addr){
 void App::mem_view_update_addr(const Kenbak& cpuState, uint8_t addr, const EeComposer& composer_){
 //   composer_.MoveTo(kAppMemView.origin);
-  composer_.MoveTo(kNePoint);
+  composer_.MoveTo(kNePoint.row(), kNePoint.col());
   composer_.MoveDown(addr / 16 + 1);
   composer_.MoveRight(4 + 4 * (addr & 0xf) + 1);
   composer_.stream_->WriteOct(cpuState.memory_read(addr));
@@ -224,14 +221,14 @@ void App::mem_view_update_addr(const Kenbak& cpuState, uint8_t addr, const EeCom
 // void App::mem_view_cursor_set(uint8_t addr) {
 void App::mem_view_cursor_set(uint8_t addr, const EeComposer& composer_) {
 //   composer_.MoveTo(kAppMemView.origin);
-  composer_.MoveTo(kNePoint);
+  composer_.MoveTo(kNePoint.row(), kNePoint.col());
   composer_.MoveDown(addr / 16 + 1);
   composer_.MoveRight(4 + 4 * (addr & 0xF));
   composer_.stream_->WriteChar('>');
 }
 void App::mem_view_cursor_clear(uint8_t addr, const EeComposer& composer_) {
 //   composer_.MoveTo(kAppMemView.origin);
-  composer_.MoveTo(kNePoint);
+  composer_.MoveTo(kNePoint.row(), kNePoint.col());
   composer_.MoveDown(addr / 16 + 1);
   composer_.MoveRight(4 + 4 * (addr & 0xf));
   composer_.stream_->WriteChar(' ');
