@@ -75,7 +75,7 @@ void App::app_decode(const Kenbak& cpuState, const EeComposer& composer_) {
     }
   }
       wrote += instruction->write(composer_);
-      instruction->~OpBase();
+      instruction->destroy();
 
   composer_.ClearChars(kAppDecodeView.width - wrote); 
 

@@ -141,8 +141,11 @@ enum class KenbakReg : uint8_t {
 struct OpBase{
   Operation operation;
 
-  virtual ~OpBase() {}
   virtual size_t write(EeComposer composer) = 0;
+  virtual void destroy() = 0;
+
+ protected:
+  ~OpBase() {}
 };
 
 struct OpAddSubLoadStore : OpBase{
@@ -161,6 +164,8 @@ struct OpAddSubLoadStore : OpBase{
     wrote += composer.stream_->WriteOct(operand);
     return wrote;
   }
+
+  void destroy() { this->~OpAddSubLoadStore(); }
 
   OpAddSubLoadStore(Operation op, uint8_t first, uint8_t second){
     const uint8_t kUpper = (first & 0700) >> 6;
@@ -185,6 +190,8 @@ struct OpOrAndLneg : OpBase{
     wrote += composer.stream_->WriteOct(operand);
     return wrote;
   }
+  void destroy() { this->~OpOrAndLneg(); }
+
   OpOrAndLneg(Operation op, uint8_t first, uint8_t second){
     const uint8_t kLower = first & 0007;
     operation = op;
@@ -209,6 +216,8 @@ struct OpJumps : OpBase{
     wrote += composer.stream_->WriteOct(operand);
     return wrote;
   }
+  void destroy() { this->~OpJumps(); }
+
   OpJumps(Operation op, uint8_t first, uint8_t second){
     const uint8_t kUpper = (first & 0700) >> 6;
     const uint8_t kLower = first & 0007;
@@ -232,6 +241,8 @@ struct OpBits : OpBase{
     wrote += composer.stream_->WriteOct(operand);
     return wrote;
   }
+  void destroy() { this->~OpBits(); }
+
   OpBits(Operation op, uint8_t first, uint8_t second){
     const uint8_t kMiddle = (first & 0070) >> 3;
     operation = op;
@@ -253,6 +264,8 @@ struct OpShiftRotate : OpBase{
     wrote += composer.stream_->WriteByte(places);
     return wrote;
   }
+  void destroy() { this->~OpShiftRotate(); }
+
   OpShiftRotate(Operation op, uint8_t first){
     const uint8_t kMiddle = (first & 0070) >> 3;
     operation = op;
@@ -267,6 +280,8 @@ struct OpMisc : OpBase{
     wrote += composer.ComposeStringC(kOperationNames[static_cast<uint8_t>(operation)]);
     return wrote;
   }
+  void destroy() { this->~OpMisc(); }
+
   OpMisc(Operation op){
     operation = op;
   }
