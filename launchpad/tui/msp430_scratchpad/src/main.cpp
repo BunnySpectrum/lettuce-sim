@@ -60,9 +60,9 @@ uint8_t debug_task_counter;
 // App app(_composer);
 App app = {};
 constexpr uint8_t kLeftMargin = 1;
-// const EePoint kHomePoint = EePoint(1 /*col*/, 1 /*row*/);
-constexpr EePoint kDebugPoint = EePoint(kScreenWidth + 10, 1 /* row */);
-constexpr EePoint kInputPoint = EePoint(kLeftMargin + 2, kDebugPoint.row());
+// const EePoint kHomePoint = {1 /*col*/, 1 /*row*/};
+constexpr EePoint kDebugPoint = {kScreenWidth + 10, 1 /* row */};
+constexpr EePoint kInputPoint = {kLeftMargin + 2, kDebugPoint.row};
 
 
 
@@ -248,20 +248,20 @@ void print_debug(const EeComposer& composer) {
   uint8_t line = 0;
 
   // Uptime
-  composer.MoveTo(kDebugPoint.row(), kDebugPoint.col());
+  composer.MoveTo(kDebugPoint.row, kDebugPoint.col);
   composer.MoveDown(++line);
   composer.ComposeStringC("Uptime (ms): ");
   composer.stream_->WriteDWord(uptime_ms);
 
   // Last compose duration
-  composer.MoveTo(kDebugPoint.row(), kDebugPoint.col());
+  composer.MoveTo(kDebugPoint.row, kDebugPoint.col);
   composer.MoveDown(++line);
   composer.ComposeStringC("Compose (ms): ");
   composer.stream_->WriteWord(compose_duration_ms);
   composer.ClearToEndOfLine();
 
   // Amount of memory used
-  composer.MoveTo(kDebugPoint.row(), kDebugPoint.col());
+  composer.MoveTo(kDebugPoint.row, kDebugPoint.col);
   composer.MoveDown(++line);
   composer.ComposeStringC("Flash / Ram: ");
   composer.stream_->WriteWord(kFlashUsed);
@@ -269,26 +269,26 @@ void print_debug(const EeComposer& composer) {
   composer.stream_->WriteWord(kRamUsed);
 
   // Remaining stack we could use
-  composer.MoveTo(kDebugPoint.row(), kDebugPoint.col());
+  composer.MoveTo(kDebugPoint.row, kDebugPoint.col);
   composer.MoveDown(++line);
   composer.ComposeStringC("Room pre/post/delta: ");
 
-  composer.MoveTo(kDebugPoint.row(), kDebugPoint.col());
+  composer.MoveTo(kDebugPoint.row, kDebugPoint.col);
   composer.MoveDown(++line);
   composer.ComposeStringC(" Setup: ");
   room_setup.print(composer);
 
-  composer.MoveTo(kDebugPoint.row(), kDebugPoint.col());
+  composer.MoveTo(kDebugPoint.row, kDebugPoint.col);
   composer.MoveDown(++line);
   composer.ComposeStringC(" HBT: ");
   room_hbt.print(composer);
 
-  composer.MoveTo(kDebugPoint.row(), kDebugPoint.col());
+  composer.MoveTo(kDebugPoint.row, kDebugPoint.col);
   composer.MoveDown(++line);
   composer.ComposeStringC(" Compose: ");
   room_compose.print(composer);
 
-  composer.MoveTo(kDebugPoint.row(), kDebugPoint.col());
+  composer.MoveTo(kDebugPoint.row, kDebugPoint.col);
   composer.MoveDown(++line);
   composer.ComposeStringC(" Debug: ");
   room_debug.print(composer);

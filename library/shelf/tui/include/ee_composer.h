@@ -32,7 +32,7 @@ public:
 // void LineFeed(RenderContext* context) const;
 
 // void EeComposer::CarriageReturn(const RenderContext* context) const {
-//   MoveTo(EePoint(context->origin.col(), context->active_row));
+//   MoveTo(EePoint{context->origin.col, context->active_row});
 // }
 // void EeComposer::LineFeed(RenderContext* context) const {
 //   stream_->Write('\n');

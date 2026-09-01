@@ -1,5 +1,8 @@
 #include "ee_point.h"
 
 EePoint EePoint::operator+(const EePoint& other) const {
-  return EePoint(this->col_ + other.col_, this->row_ + other.row_);
+  return EePoint{
+      static_cast<uint8_t>(col + other.col),
+      static_cast<uint8_t>(row + other.row),
+  };
 }

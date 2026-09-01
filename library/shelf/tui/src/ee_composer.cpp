@@ -7,9 +7,9 @@ EeComposer::EeComposer(const ByteStream *stream) : stream_(stream) {};
 void EeComposer::MoveTo(const EePoint &point) const
 {
   stream_->WriteStringC("\x1b[");
-  stream_->WriteByte(point.row());
+  stream_->WriteByte(point.row);
   stream_->WriteChar(';');
-  stream_->WriteByte(point.col());
+  stream_->WriteByte(point.col);
   stream_->WriteChar('H');
 }
 
