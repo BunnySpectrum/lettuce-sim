@@ -12,6 +12,14 @@ constexpr EePoint kSwPoint = {1, kAppMemView.height + 1};
 // const struct AppView kAppDecodeView = {kSwPoint, 32, 3};
 constexpr struct AppView kAppDecodeView = {32, 3};
 
+
+inline void* operator new(size_t, void* address) {
+  return address;
+}
+
+inline void operator delete(void*, void*) {
+}
+
 // void App::app_decode(const Kenbak& cpuState) {
 void App::app_decode(const Kenbak& cpuState, const EeComposer& composer_) {
 
@@ -36,41 +44,38 @@ void App::app_decode(const Kenbak& cpuState, const EeComposer& composer_) {
   wrote = 0;
   const Operation kOperation = Kenbak::decode_operation(cursorData);
   const CodeGroup kCodeGroup = Kenbak::decode_code_group(cursorData);
-  // wrote += composer_.ComposeStringC(kOperationNames[static_cast<uint8_t>(kOperation)]);
+  // alignas(KenbakInstruction) uint8_t instructionBuffer[sizeof(KenbakInstruction)];
+  uint8_t instructionBuffer[sizeof(KenbakInstruction)] __attribute__((aligned(__alignof__(KenbakInstruction))));
+  OpBase* instruction = 0;
 
-  CodeAddressing addressing;
   switch (kCodeGroup){
     case CodeGroup::kAddSubLoadStore:{
-      auto instruction = OpAddSubLoadStore(kOperation, cursorData, cursorDataNext);
-      wrote += instruction.write(composer_);
+      instruction = new(instructionBuffer) OpAddSubLoadStore(kOperation, cursorData, cursorDataNext);
       break;
     }
     case CodeGroup::kOrAndLneg:{
-      auto instruction = OpOrAndLneg(kOperation, cursorData, cursorDataNext);
-      wrote += instruction.write(composer_);
+      instruction = new(instructionBuffer) OpOrAndLneg(kOperation, cursorData, cursorDataNext);
       break;
     }
     case CodeGroup::kJumps:{
-      auto instruction = OpJumps(kOperation, cursorData, cursorDataNext);
-      wrote += instruction.write(composer_);
+      instruction = new(instructionBuffer) OpJumps(kOperation, cursorData, cursorDataNext);
       break;
     }
     case CodeGroup::kBits:{
-      auto instruction = OpBits(kOperation, cursorData, cursorDataNext);
-      wrote += instruction.write(composer_);
+      instruction = new(instructionBuffer) OpBits(kOperation, cursorData, cursorDataNext);
       break;
     }
     case CodeGroup::kShiftRotate:{
-      auto instruction = OpShiftRotate(kOperation, cursorData);
-      wrote += instruction.write(composer_);
+      instruction = new(instructionBuffer) OpShiftRotate(kOperation, cursorData);
       break;
     }
     case CodeGroup::kMisc:{
-      auto instruction = OpMisc(kOperation);
-      wrote += instruction.write(composer_);
+      instruction = new(instructionBuffer) OpMisc(kOperation);
       break;
     }
   }
+      wrote += instruction->write(composer_);
+      instruction->~OpBase();
 
   composer_.ClearChars(kAppDecodeView.width - wrote); 
 

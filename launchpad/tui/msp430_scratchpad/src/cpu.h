@@ -141,6 +141,7 @@ enum class KenbakReg : uint8_t {
 struct OpBase{
   Operation operation;
 
+  virtual ~OpBase() {}
   virtual size_t write(EeComposer composer) = 0;
 };
 
@@ -269,6 +270,16 @@ struct OpMisc : OpBase{
   OpMisc(Operation op){
     operation = op;
   }
+};
+
+
+union KenbakInstruction{
+  OpAddSubLoadStore addSubLoadStore;
+  OpOrAndLneg orAndLneg;
+  OpJumps jumps;
+  OpBits bits;
+  OpShiftRotate shiftRotate;
+  OpMisc misc;
 };
 
 #define MEM_SIZE 256
