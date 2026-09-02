@@ -13,7 +13,6 @@
 #include <Arduino.h>
 #undef OUTPUT
 #undef INPUT
-#include <limits.h>
 #include <msp430.h>
 
 ByteStreamEnergia console_uart(0);
@@ -35,8 +34,6 @@ int8_t locale_string_delta(const char* const* locale_strings, uint8_t prev, uint
 }
 /* end */
 
-uint16_t last_millis;
-uint32_t uptime_ms = 0;
 uint16_t compose_duration_ms = 0;
 uint8_t debug_state = 0;
 uint8_t input_count = 0;
@@ -86,8 +83,6 @@ int ReadCommand(uint8_t* character) {
 /* end */
 
 /* Kenbak */
-const char* const kHbtValues[] = {"/", "\\"};
-uint8_t hbt_index = 0;
 Kenbak cpuState;
 
 // How many ticks (today, 1tick = 1ms) until we run
@@ -96,7 +91,6 @@ Kenbak cpuState;
 //  0 = do not update counter each tick
 #define CPU_TASK_PERIOD 200
 uint8_t cpu_task_counter;
-EeText hbt_text = EeText(kDebugPoint);
 /* end */
 
 
@@ -118,7 +112,6 @@ void ComposeSheet(const EeComposer& composer) {
 }
 
 void setup() {
-  paint_stack();
   room_setup.update_pre();
   console_uart.Configure(115200);  // -38 to room
 
@@ -130,11 +123,9 @@ void setup() {
 
   input_text.SetText("");
 
-  hbt_text.SetText(kHbtValues[hbt_index]);
   _composer.ClearScreen();
   _composer.ShowCursor(false);
 
-  last_millis = millis();
   room_setup.update_post();
   app.mem_view_cursor_set(cpuState.cursor_address(), _composer);
 }
@@ -148,26 +139,11 @@ void task_cpu(const EeComposer& composer) {
   }
 }
 
-uint16_t ms_since_last_check(uint16_t* last_millis) {
-  const uint16_t new_millis = millis();
-  uint16_t result;
-
-  if (new_millis >= *last_millis) {
-    result = new_millis - *last_millis;
-  } else {
-    result = *last_millis + new_millis + (UINT_MAX - *last_millis);
-  }
-
-  *last_millis = new_millis;
-  return result;
-}
-
 void loop() {
   // setup -> loop, no extra stack
 
   delay(1);
 
-  uptime_ms += ms_since_last_check(&last_millis); 
   if (console_uart.Available()) {
     last_input = console_uart.ReadByte();
     switch (last_input) {
@@ -240,18 +216,13 @@ void print_debug(const EeComposer& composer) {
   if (!debug_enabled) {
     return;
   }
-  hbt_index++;
-  hbt_index %= sizeof(kHbtValues) / sizeof(char*);
-  hbt_text.SetText(kHbtValues[hbt_index]);
-  hbt_text.Compose(composer);  // -34 to room
-
   uint8_t line = 0;
 
   // Uptime
   composer.MoveTo(kDebugPoint.row, kDebugPoint.col);
   composer.MoveDown(++line);
   composer.ComposeStringC("Uptime (ms): ");
-  composer.stream_->WriteDWord(uptime_ms);
+  composer.stream_->WriteDWord(millis());
 
   // Last compose duration
   composer.MoveTo(kDebugPoint.row, kDebugPoint.col);
