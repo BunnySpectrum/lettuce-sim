@@ -138,6 +138,8 @@ enum class KenbakReg : uint8_t {
   INPUT = 0377,
 };
 
+size_t write_operand(EeComposer composer, Operation operation, uint8_t operand, CodeAddressing addressing);
+
 struct OpBase{
   Operation operation;
 
@@ -159,9 +161,7 @@ struct OpAddSubLoadStore : OpBase{
     wrote += composer.ComposeStringC(" ");
     wrote += composer.ComposeStringC(kOpRegNames[static_cast<uint8_t>(reg) - static_cast<uint8_t>(OpReg::kBegin)]);
     wrote += composer.ComposeStringC(" ");
-    wrote += composer.ComposeStringC(kAddressingNames[static_cast<uint8_t>(addressing) - static_cast<uint8_t>(CodeAddressing::kBegin)]);
-    wrote += composer.ComposeStringC(" ");
-    wrote += composer.stream_->WriteOct(operand);
+    wrote += write_operand(composer, operation, operand, addressing);
     return wrote;
   }
 
@@ -185,9 +185,7 @@ struct OpOrAndLneg : OpBase{
     size_t wrote = 0;
     wrote += composer.ComposeStringC(kOperationNames[static_cast<uint8_t>(operation)]);
     wrote += composer.ComposeStringC(" ");
-    wrote += composer.ComposeStringC(kAddressingNames[static_cast<uint8_t>(addressing) - static_cast<uint8_t>(CodeAddressing::kBegin)]);
-    wrote += composer.ComposeStringC(" ");
-    wrote += composer.stream_->WriteOct(operand);
+    wrote += write_operand(composer, operation, operand, addressing);
     return wrote;
   }
   void destroy() { this->~OpOrAndLneg(); }
@@ -210,10 +208,18 @@ struct OpJumps : OpBase{
     wrote += composer.ComposeStringC(kOperationNames[static_cast<uint8_t>(operation)]);
     wrote += composer.ComposeStringC(" ");
     wrote += composer.ComposeStringC(kOpJumpTestNames[static_cast<uint8_t>(testSource) - static_cast<uint8_t>(OpJumpTest::kBegin)]);
+    if (testSource != OpJumpTest::kUnconditional){
+      wrote += composer.ComposeStringC(kComparisonNames[static_cast<uint8_t>(comparison) - static_cast<uint8_t>(CodeComparison::kBegin)]);
+    }
     wrote += composer.ComposeStringC(" ");
-    wrote += composer.ComposeStringC(kComparisonNames[static_cast<uint8_t>(comparison) - static_cast<uint8_t>(CodeComparison::kBegin)]);
-    wrote += composer.ComposeStringC(" ");
-    wrote += composer.stream_->WriteOct(operand);
+
+    if((operation == Operation::kJumpIndirect) || (operation == Operation::kJumpMarkIndirect)){
+      wrote += composer.stream_->WriteChar('(');
+      wrote += composer.stream_->WriteOct(operand);
+      wrote += composer.stream_->WriteChar(')');
+    }else{
+      wrote += composer.stream_->WriteOct(operand);
+    }
     return wrote;
   }
   void destroy() { this->~OpJumps(); }
@@ -235,7 +241,7 @@ struct OpBits : OpBase{
   size_t write(EeComposer composer){
     size_t wrote = 0;
     wrote += composer.ComposeStringC(kOperationNames[static_cast<uint8_t>(operation)]);
-    wrote += composer.ComposeStringC(" ");
+    wrote += composer.ComposeStringC(" b");
     wrote += composer.stream_->WriteByte(digit);
     wrote += composer.ComposeStringC(" ");
     wrote += composer.stream_->WriteOct(operand);
@@ -298,12 +304,26 @@ union KenbakInstruction{
 };
 
 #define MEM_SIZE 256
-extern const uint8_t kExampleImage[MEM_SIZE];
+extern const uint8_t kImageInstructions[MEM_SIZE];
+extern const uint8_t kImageDemo[MEM_SIZE];
 class Kenbak {
 
  public:
   Kenbak() : step_(false), cursorAddress_(0) {
-    memcpy(memory, kExampleImage, MEM_SIZE);
+    load_image(0);
+  }
+
+  void load_image(uint8_t slot){
+    switch(slot){
+      case 0:
+        memcpy(memory, kImageInstructions, MEM_SIZE);
+        break;
+      case 1:
+        memcpy(memory, kImageDemo, MEM_SIZE);
+        break;
+      default:
+        break;
+    }  
   }
 
  static bool decode_addressing(uint8_t value, CodeAddressing* addressing){

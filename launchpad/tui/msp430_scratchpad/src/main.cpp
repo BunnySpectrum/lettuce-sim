@@ -84,6 +84,7 @@ int ReadCommand(uint8_t* character) {
 
 /* Kenbak */
 Kenbak cpuState;
+uint8_t activeImage = 0;
 
 // How many ticks (today, 1tick = 1ms) until we run
 //  >1 = decrement each tick
@@ -184,6 +185,11 @@ void loop() {
         break;
       case '1':
         debug_enabled ^= true;
+        break;
+      case 'm':
+        activeImage ^= 1;
+        cpuState.load_image(activeImage);
+        app.request_update_all();
         break;
       default:
         break;

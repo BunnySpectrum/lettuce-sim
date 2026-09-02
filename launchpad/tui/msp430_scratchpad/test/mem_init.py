@@ -433,15 +433,10 @@ class OpNoop(OpGroupMisc):
 
 leader = " " * 4
 image = [0x0]*256
-image[0o003] = 0x4
-image[0o004] = 0o103 
-image[0o005] = 0o001
-image[0o006] = 0o134
-image[0o007] = 0o200
-image[0o010] = 0o344
-image[0o011] = 0o004
+image[0o003] = 0o004 # PC = 004
+image[0o004] = 0o000 # HALT
 
-mem_addr = 0o20
+mem_addr = 0o005
 for op_class in [OpAdd, OpSub, OpLoad, OpStore]:
     for reg in list(Register):
         print(f"{leader}// {op_class.c_name()} {reg.c_name()}")
@@ -457,7 +452,7 @@ for op_class in [OpAdd, OpSub, OpLoad, OpStore]:
         else:
             print("")
 
-# mem_addr = 0o114
+# mem_addr = 0o101
 for op_class in [OpOr, OpAnd, OpLneg]:
     print(f"{leader}// {op_class.c_name()}")
     for addressing in list(Addressing):
@@ -472,7 +467,7 @@ for op_class in [OpOr, OpAnd, OpLneg]:
     else:
         print("")
 
-# mem_addr = 0o133
+# mem_addr = 0o120
 for op_class in [OpJumpDirect, OpJumpIndirect, OpJumpMarkDirect, OpJumpMarkIndirect]:
     for check in list(JumpCheck):
         print(f"{leader}// {op_class.c_name()} {check.c_name()}")
@@ -480,6 +475,8 @@ for op_class in [OpJumpDirect, OpJumpIndirect, OpJumpMarkDirect, OpJumpMarkIndir
             opcode = op_class(check=check, condition=condition)
             code = opcode.to_code()[0]
 
+            if(mem_addr == 0o200):
+                mem_addr = 0o204
             image[mem_addr] = code
             print(
                 f"{leader}memory[{mem_addr:0>4o}] = {code:0>4o};  // {condition.c_name()}"
@@ -488,7 +485,7 @@ for op_class in [OpJumpDirect, OpJumpIndirect, OpJumpMarkDirect, OpJumpMarkIndir
         else:
             print("")
 
-# mem_addr = 0o253
+# mem_addr = 0o244
 for op_class in [OpSetTo0, OpSetTo1, OpSkipOn0, OpSkipOn1]:
     print(f"{leader}// {op_class.c_name()}")
     for digit in range(8):
@@ -503,7 +500,7 @@ for op_class in [OpSetTo0, OpSetTo1, OpSkipOn0, OpSkipOn1]:
     else:
         print("")
 
-# mem_addr = 0o313
+# mem_addr = 0o304
 for op_class in [OpRightShift, OpRightRotate, OpLeftShift, OpLeftRotate]:
     for register in list(RegisterShiftRotate):
         print(f"{leader}// {op_class.c_name()} {register.c_name()}")
@@ -519,7 +516,7 @@ for op_class in [OpRightShift, OpRightRotate, OpLeftShift, OpLeftRotate]:
         else:
             print("")
 
-# mem_addr = 0o313
+# mem_addr = 0o344
 for op_class in [OpHalt, OpNoop]:
     print(f"{leader}// {op_class.c_name()}")
     opcode = op_class()
@@ -533,8 +530,26 @@ for op_class in [OpHalt, OpNoop]:
     print("\n")
 
 
-print("const uint8_t kExampleImage[MEM_SIZE] = {", end='')
+print("const uint8_t kImageInstructions[MEM_SIZE] = {", end='')
 for index, code in enumerate(image):
+    if (index)%16 == 0:
+        print(f'\n{leader}', end='')
+    print(f"{code:0>4o},", end='')
+print('\n};')
+
+
+
+demoImage = [0x0]*256
+# All comments in octal
+demoImage[0o003] = 0o004 # PC = 004
+demoImage[0o004] = 0o023 # LOAD A C=123
+demoImage[0o005] = 0o123
+demoImage[0o006] = 0o123 # LOAD B C=234
+demoImage[0o007] = 0o234
+demoImage[0o010] = 0o223 # LOAD X C=345
+demoImage[0o011] = 0o345
+print("const uint8_t kImageDemo[MEM_SIZE] = {", end='')
+for index, code in enumerate(demoImage):
     if (index)%16 == 0:
         print(f'\n{leader}', end='')
     print(f"{code:0>4o},", end='')
