@@ -235,9 +235,9 @@ void print_debug(const EeComposer& composer) {
   composer.MoveTo(kDebugPoint.row, kDebugPoint.col);
   composer.MoveDown(++line);
   composer.ComposeStringC("Flash / Ram: ");
-  composer.stream_->WriteWord(kFlashUsed);
+  composer.stream_->WriteWord(flash_used());
   composer.ComposeStringC(" / ");
-  composer.stream_->WriteWord(kRamUsed);
+  composer.stream_->WriteWord(ram_used());
 
   // Remaining stack we could use
   composer.MoveTo(kDebugPoint.row, kDebugPoint.col);

@@ -9,14 +9,14 @@
 // Ram goes data, bss, noinit
 extern unsigned char __data_start[];  // start of RAM
 extern unsigned char __noinit_end[];
-extern const unsigned int kRamUsed;
+uint16_t ram_used();
 
 #define kVectorSize 32
 #define kRomOrigin 0xC000
 extern unsigned char __ctors_start[];
 extern unsigned char _etext[];
 extern unsigned char __data_size[];
-extern const unsigned int kFlashUsed;
+uint16_t flash_used();
 
 void paint_stack();
 int task_update_room();
