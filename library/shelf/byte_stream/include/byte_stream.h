@@ -32,7 +32,35 @@ class ByteStream {
     WriteChar(value + '0');
   }
 
-  size_t WriteByte(uint8_t value) const { WriteX(value); }
+  // Retain the generic 32-bit formatter so the implementations can be
+  // compared on the MSP430.
+  size_t WriteByteViaWriteX(uint8_t value) const { return WriteX(value); }
+
+  size_t WriteByte(uint8_t value) const {
+    size_t wrote = 0;
+
+    // Avoid division and modulo: on the MSP430, integer promotion would make
+    // those operations pull in the comparatively expensive division helpers.
+    if (value >= 200) {
+      wrote += WriteChar('2');
+      value -= 200;
+    } else if (value >= 100) {
+      wrote += WriteChar('1');
+      value -= 100;
+    }
+
+    if (wrote != 0 || value >= 10) {
+      uint8_t tens = 0;
+      while (value >= 10) {
+        value -= 10;
+        ++tens;
+      }
+      wrote += WriteChar('0' + tens);
+    }
+
+    wrote += WriteChar('0' + value);
+    return wrote;
+  }
 
   size_t WriteWord(uint16_t value) const { WriteX(value); }
 

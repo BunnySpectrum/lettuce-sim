@@ -19,9 +19,15 @@ class ByteStreamEnergia : public ByteStream {
 
   size_t Write(const uint8_t* buffer, size_t size) const { return stream_->write(buffer, size); }
 
-  size_t WriteStringC(const char* c_str) const { return stream_->print(c_str); }
+  size_t WriteStringC(const char* c_str) const {
+    size_t wrote = 0;
+    while(*c_str != '\0'){
+      wrote += stream_->write(static_cast<uint8_t>(*c_str++));
+    }
+    return wrote;
+  }
 
-  size_t WriteChar(uint8_t value) const { stream_->write(value); }
+  size_t WriteChar(uint8_t value) const { return stream_->write(value); }
 
   //  private:
   HardwareSerial* stream_;
