@@ -85,6 +85,7 @@ int ReadCommand(uint8_t* character) {
 /* Kenbak */
 Kenbak cpuState;
 uint8_t activeImage = 0;
+uint8_t stepCount = 0;
 
 // How many ticks (today, 1tick = 1ms) until we run
 //  >1 = decrement each tick
@@ -132,8 +133,11 @@ void setup() {
 }
 
 void task_cpu(const EeComposer& composer) {
-  if (cpuState.step()) {
+  if (cpuState.is_running() || stepCount > 0) {
     cpuState.execute();
+    if(stepCount > 0){
+      stepCount--;
+    }
     // app.mem_view_update_addr(cpuState, static_cast<uint8_t>(KenbakReg::PC));
     app.mem_view_update_addr(cpuState, static_cast<uint8_t>(KenbakReg::PC), _composer);
     app.request_update_decode();
@@ -149,11 +153,15 @@ void loop() {
     last_input = console_uart.ReadByte();
     switch (last_input) {
       case 'r':
+        _composer.ClearScreen();
         app.mem_view_cursor_set(cpuState.cursor_address(), _composer);
         app.request_update_all();
         break;
       case 'g':
-        cpuState.toggle_step();
+        cpuState.toggle_run();
+        break;
+      case 'n':
+        stepCount = 1;
         break;
       case 's':
         // case 'j':

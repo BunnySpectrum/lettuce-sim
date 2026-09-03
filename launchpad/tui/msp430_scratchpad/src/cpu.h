@@ -309,7 +309,7 @@ extern const uint8_t kImageDemo[MEM_SIZE];
 class Kenbak {
 
  public:
-  Kenbak() : step_(false), cursorAddress_(0) {
+  Kenbak() : run_(false), cursorAddress_(0) {
     load_image(0);
   }
 
@@ -472,7 +472,7 @@ class Kenbak {
 }
 
 
-  void toggle_step() { step_ ^= true; }
+  void toggle_run() { run_ ^= true; }
   void move_cursor_address(int16_t amount) { cursorAddress_ += amount; }
   uint8_t memory_read(uint8_t address) const { return memory[address]; }
   uint8_t register_read(KenbakReg reg) const { return memory[static_cast<uint8_t>(reg)]; }
@@ -482,13 +482,12 @@ class Kenbak {
   void memory_write(uint8_t address, uint8_t value) { memory[address] = value; }
 
   uint8_t cursor_address() const { return cursorAddress_; }
-  bool step() const { return step_; }
+  bool is_running() const { return run_; }
   uint8_t memory[MEM_SIZE];
 
  private:
-  //   uint8_t memory_[MEM_SIZE];
   uint8_t cursorAddress_;
-  bool step_;
+  bool run_;
 };
 // #undef MEM_SIZE
 #endif
