@@ -214,13 +214,12 @@ void App::app_mem_draw_all(const Kenbak& cpuState, const EeComposer& composer_) 
   }
 }
 
-// void App::mem_view_update_addr(const Kenbak& cpuState, uint8_t addr){
-void App::mem_view_update_addr(const Kenbak& cpuState, uint8_t addr, const EeComposer& composer_){
+void App::mem_view_update_addr(uint8_t addr, uint8_t data, const EeComposer& composer_){
 //   composer_.MoveTo(kAppMemView.origin);
   composer_.MoveTo(kNePoint.row, kNePoint.col);
   composer_.MoveDown(addr / 16 + 1);
   composer_.MoveRight(4 + 4 * (addr & 0xf) + 1);
-  composer_.stream_->WriteOct(cpuState.memory_read(addr));
+  composer_.stream_->WriteOct(data);
 }
 
 // void App::mem_view_cursor_set(uint8_t addr) {

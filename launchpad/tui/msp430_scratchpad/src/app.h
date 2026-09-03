@@ -19,7 +19,7 @@ class App{
 void app_decode(const Kenbak& cpuState, const EeComposer& composer_);
 void app_controls(const EeComposer& composer_);
 void app_mem_draw_all(const Kenbak& cpuState, const EeComposer& composer_);
-void mem_view_update_addr(const Kenbak& cpuState, uint8_t addr, const EeComposer& composer_);
+void mem_view_update_addr(uint8_t addr, uint8_t data, const EeComposer& composer_);
 void mem_view_cursor_set(uint8_t addr, const EeComposer& composer_);
 void mem_view_cursor_clear(uint8_t addr, const EeComposer& composer_);
 

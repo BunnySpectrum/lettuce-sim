@@ -138,8 +138,8 @@ void task_cpu(const EeComposer& composer) {
     if(stepCount > 0){
       stepCount--;
     }
-    // app.mem_view_update_addr(cpuState, static_cast<uint8_t>(KenbakReg::PC));
-    app.mem_view_update_addr(cpuState, static_cast<uint8_t>(KenbakReg::PC), _composer);
+    const uint8_t address = static_cast<uint8_t>(KenbakReg::PC);
+    app.mem_view_update_addr(address, cpuState.memory_read(address), _composer);
     app.request_update_decode();
   }
 }
