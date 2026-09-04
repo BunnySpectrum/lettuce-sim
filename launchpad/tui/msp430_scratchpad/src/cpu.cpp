@@ -38,6 +38,16 @@ const char* const kOpRegNames[static_cast<uint8_t>(OpReg::kCount)] = {
     "B",
     "X",
 };
+const uint8_t kOpRegAddresses[static_cast<uint8_t>(OpReg::kCount)] = {
+    static_cast<uint8_t>(KenbakReg::A),
+    static_cast<uint8_t>(KenbakReg::B),
+    static_cast<uint8_t>(KenbakReg::X),
+};
+const uint8_t kOpRegStatusAddresses[static_cast<uint8_t>(OpReg::kCount)] = {
+    static_cast<uint8_t>(KenbakReg::AOC),
+    static_cast<uint8_t>(KenbakReg::BOC),
+    static_cast<uint8_t>(KenbakReg::XOC),
+};
 
 const char* const kOpJumpTestNames[static_cast<uint8_t>(OpJumpTest::kCount)] = {
     "A",
@@ -59,7 +69,7 @@ const char* const kComparisonNames[static_cast<uint8_t>(CodeComparison::kCount)]
     ">0",
 };
 const uint8_t kImageInstructions[MEM_SIZE] = {
-    0000,0000,0000,0004,0000,0003,0004,0005,0006,0007,0103,0104,0105,0106,0107,0203,
+    0000,0000,0000,0004,0200,0003,0004,0005,0006,0007,0103,0104,0105,0106,0107,0203,
     0204,0205,0206,0207,0013,0014,0015,0016,0017,0113,0114,0115,0116,0117,0213,0214,
     0215,0216,0217,0023,0024,0025,0026,0027,0123,0124,0125,0126,0127,0223,0224,0225,
     0226,0227,0033,0034,0035,0036,0037,0133,0134,0135,0136,0137,0233,0234,0235,0236,
@@ -77,7 +87,7 @@ const uint8_t kImageInstructions[MEM_SIZE] = {
     0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,
 };
 const uint8_t kImageDemo[MEM_SIZE] = {
-    0000,0000,0000,0004,0023,0123,0123,0234,0223,0345,0000,0000,0000,0000,0000,0000,
+    0000,0002,0003,0004,0004,0001,0023,0000,0005,0001,0000,0000,0000,0000,0000,0000,
     0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,
     0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,
     0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,

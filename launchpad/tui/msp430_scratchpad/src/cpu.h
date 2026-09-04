@@ -65,6 +65,8 @@ inline OpReg& operator++(OpReg& obj){
   return obj;
 }
 extern const char* const kOpRegNames[static_cast<uint8_t>(OpReg::kCount)];
+extern const uint8_t kOpRegAddresses[static_cast<uint8_t>(OpReg::kCount)];
+extern const uint8_t kOpRegStatusAddresses[static_cast<uint8_t>(OpReg::kCount)];
 
 enum class OpJumpTest : uint8_t {
   kA = 0,
@@ -137,12 +139,20 @@ enum class KenbakReg : uint8_t {
   XOC = 0203,
   INPUT = 0377,
 };
+constexpr uint8_t kRegX = 2;
+constexpr uint8_t kRegPC = 3;
 
 size_t write_operand(EeComposer composer, Operation operation, uint8_t operand, CodeAddressing addressing);
+
+struct ModifiedMemory {
+ uint16_t updateBitmask;
+ uint8_t address; 
+};
 
 struct OpBase{
   Operation operation;
 
+  virtual ModifiedMemory execute(uint8_t* memory) = 0;
   virtual size_t write(EeComposer composer) = 0;
   virtual void destroy() = 0;
 
@@ -153,19 +163,7 @@ struct OpBase{
 struct OpAddSubLoadStore : OpBase{
   OpReg reg;
   CodeAddressing addressing;
-  uint8_t operand;
-
-  size_t write(EeComposer composer){
-    size_t wrote = 0;
-    wrote += composer.ComposeStringC(kOperationNames[static_cast<uint8_t>(operation)]);
-    wrote += composer.ComposeStringC(" ");
-    wrote += composer.ComposeStringC(kOpRegNames[static_cast<uint8_t>(reg) - static_cast<uint8_t>(OpReg::kBegin)]);
-    wrote += composer.ComposeStringC(" ");
-    wrote += write_operand(composer, operation, operand, addressing);
-    return wrote;
-  }
-
-  void destroy() { this->~OpAddSubLoadStore(); }
+  uint8_t addrOrOperand;
 
   OpAddSubLoadStore(Operation op, uint8_t first, uint8_t second){
     const uint8_t kUpper = (first & 0700) >> 6;
@@ -173,13 +171,76 @@ struct OpAddSubLoadStore : OpBase{
     operation = op;
     reg = static_cast<OpReg>(kUpper);
     addressing = static_cast<CodeAddressing>(kLower);
-    operand = second;
+    addrOrOperand = second;
   }
+
+  ModifiedMemory execute(uint8_t* memory){
+    uint8_t address;
+    switch(addressing){
+      case CodeAddressing::kConstant:
+        address = static_cast<uint8_t>(memory[kRegPC] + 1);
+        break;
+      case CodeAddressing::kMemory:
+        address = addrOrOperand;
+        break;
+      case CodeAddressing::kIndirect:
+        address = memory[addrOrOperand];
+        break;
+      case CodeAddressing::kIndexed:
+        address = memory[kRegX] + addrOrOperand;
+        break;
+      case CodeAddressing::kIndirectIndexed:
+        address = memory[kRegX] + memory[memory[addrOrOperand]];
+        break;
+    } // zzz confirm compiler errors for unhandled case
+
+    // Address of the A, B, or X register
+    // zzz overflow/carry not implemented
+    const uint8_t kRegAddress = kOpRegAddresses[static_cast<uint8_t>(reg)];
+    uint16_t temp;
+    switch(operation){
+      case Operation::kAdd:
+        temp = memory[kRegAddress] + memory[address];
+        memory[kRegAddress] = static_cast<uint8_t>(temp);
+        break;
+      case Operation::kSub:
+        temp = memory[kRegAddress] - memory[address];
+        memory[kRegAddress] = static_cast<uint8_t>(temp);
+        break;
+      case Operation::kLoad:
+        memory[kRegAddress] = memory[address];
+        break;
+      case Operation::kStore:
+        memory[address] = memory[kRegAddress];
+        break;
+    }
+
+    memory[kRegPC] += 2;
+    return ModifiedMemory{0, 0};
+  }
+
+  size_t write(EeComposer composer){
+    size_t wrote = 0;
+    wrote += composer.ComposeStringC(kOperationNames[static_cast<uint8_t>(operation)]);
+    wrote += composer.ComposeStringC(" ");
+    wrote += composer.ComposeStringC(kOpRegNames[static_cast<uint8_t>(reg) - static_cast<uint8_t>(OpReg::kBegin)]);
+    wrote += composer.ComposeStringC(" ");
+    wrote += write_operand(composer, operation, addrOrOperand, addressing);
+    return wrote;
+  }
+
+  void destroy() { this->~OpAddSubLoadStore(); }
+
 };
 
 struct OpOrAndLneg : OpBase{
   CodeAddressing addressing;
   uint8_t operand;
+
+  ModifiedMemory execute(uint8_t* memory){
+    memory[kRegPC] += 2;
+    return ModifiedMemory{0, 0};
+  }
   
   size_t write(EeComposer composer){
     size_t wrote = 0;
@@ -202,6 +263,11 @@ struct OpJumps : OpBase{
   OpJumpTest testSource;
   CodeComparison comparison;
   uint8_t operand;
+
+  ModifiedMemory execute(uint8_t* memory){
+    memory[kRegPC] += 2;
+    return ModifiedMemory{0, 0};
+  }
   
   size_t write(EeComposer composer){
     size_t wrote = 0;
@@ -238,6 +304,11 @@ struct OpBits : OpBase{
   uint8_t digit;
   uint8_t operand;
   
+  ModifiedMemory execute(uint8_t* memory){
+    memory[kRegPC] += 2;
+    return ModifiedMemory{0, 0};
+  }
+
   size_t write(EeComposer composer){
     size_t wrote = 0;
     wrote += composer.ComposeStringC(kOperationNames[static_cast<uint8_t>(operation)]);
@@ -261,6 +332,11 @@ struct OpShiftRotate : OpBase{
   OpShiftReg reg;
   uint8_t places;
   
+  ModifiedMemory execute(uint8_t* memory){
+    memory[kRegPC] += 1;
+    return ModifiedMemory{0, 0};
+  }
+
   size_t write(EeComposer composer){
     size_t wrote = 0;
     wrote += composer.ComposeStringC(kOperationNames[static_cast<uint8_t>(operation)]);
@@ -281,6 +357,13 @@ struct OpShiftRotate : OpBase{
 };
 
 struct OpMisc : OpBase{
+  
+  ModifiedMemory execute(uint8_t* memory){
+    if(operation == Operation::kNoop){
+      memory[kRegPC] += 1;
+    }
+    return ModifiedMemory{0, 0};
+  }
   size_t write(EeComposer composer){
     size_t wrote = 0;
     wrote += composer.ComposeStringC(kOperationNames[static_cast<uint8_t>(operation)]);
@@ -302,6 +385,15 @@ union KenbakInstruction{
   OpShiftRotate shiftRotate;
   OpMisc misc;
 };
+
+
+inline void* operator new(size_t, void* address) {
+  return address;
+}
+
+inline void operator delete(void*, void*) {
+}
+
 
 #define MEM_SIZE 256
 extern const uint8_t kImageInstructions[MEM_SIZE];
@@ -471,12 +563,49 @@ class Kenbak {
   return result;
 }
 
+  OpBase* decode_instruction(uint8_t address, uint8_t* instructionBuffer) const{
+    const auto cursorData = memory[address];
+    const auto cursorDataNext = memory[static_cast<uint8_t>(address + 1)];
+    const Operation kOperation = decode_operation(cursorData);
+
+  switch (decode_code_group(cursorData)){
+    case CodeGroup::kAddSubLoadStore:{
+      return new(instructionBuffer) OpAddSubLoadStore(kOperation, cursorData, cursorDataNext);
+    }
+    case CodeGroup::kOrAndLneg:{
+      return new(instructionBuffer) OpOrAndLneg(kOperation, cursorData, cursorDataNext);
+    }
+    case CodeGroup::kJumps:{
+      return new(instructionBuffer) OpJumps(kOperation, cursorData, cursorDataNext);
+    }
+    case CodeGroup::kBits:{
+      return new(instructionBuffer) OpBits(kOperation, cursorData, cursorDataNext);
+    }
+    case CodeGroup::kShiftRotate:{
+      return new(instructionBuffer) OpShiftRotate(kOperation, cursorData);
+    }
+    case CodeGroup::kMisc:{
+      return new(instructionBuffer) OpMisc(kOperation);
+    }
+  }
+
+    return nullptr;
+  }
 
   void toggle_run() { run_ ^= true; }
   void move_cursor_address(int16_t amount) { cursorAddress_ += amount; }
   uint8_t memory_read(uint8_t address) const { return memory[address]; }
   uint8_t register_read(KenbakReg reg) const { return memory[static_cast<uint8_t>(reg)]; }
-  void execute() { memory[static_cast<uint8_t>(KenbakReg::PC)]++; }
+  void execute() { 
+    
+    uint8_t instructionBuffer[sizeof(KenbakInstruction)] __attribute__((aligned(__alignof__(KenbakInstruction))));
+
+    const uint8_t pcAddr = static_cast<uint8_t>(KenbakReg::PC); 
+    OpBase* instruction = decode_instruction(memory[pcAddr], instructionBuffer);
+
+    instruction->execute(memory);
+    instruction->destroy();
+  }
 
   void register_write(KenbakReg reg, uint8_t value) { memory[static_cast<uint8_t>(reg)] = value; }
   void memory_write(uint8_t address, uint8_t value) { memory[address] = value; }
