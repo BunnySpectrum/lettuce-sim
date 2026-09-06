@@ -43,7 +43,6 @@ void App::app_decode(const Kenbak& cpuState, const EeComposer& composer_) {
   OpBase* instruction = cpuState.decode_instruction(cursorAddr, instructionBuffer);
   if(instruction != nullptr){
     wrote += instruction->write(composer_);
-    instruction->destroy();
   }
 
 
