@@ -198,14 +198,36 @@ struct OpAddSubLoadStore : OpBase{
     // zzz overflow/carry not implemented
     const uint8_t kRegAddress = kOpRegAddresses[static_cast<uint8_t>(reg)];
     uint16_t temp;
+    uint8_t status = 0;
+
     switch(operation){
       case Operation::kAdd:
         temp = memory[kRegAddress] + memory[address];
+        if (static_cast<uint8_t>(temp) < memory[kRegAddress]){
+          status |= 0b10;
+        }
+        if(  !((memory[kRegAddress] ^ memory[address])&0x80)  ){
+          // same sign, overflow possible
+          if( (memory[address]^static_cast<uint8_t>(temp))&0x80){
+            status |= 0b1;
+          }
+        }
         memory[kRegAddress] = static_cast<uint8_t>(temp);
+        memory[kOpRegStatusAddresses[static_cast<uint8_t>(reg)]] = status;
         break;
       case Operation::kSub:
         temp = memory[kRegAddress] - memory[address];
+        if (static_cast<uint8_t>(temp) > memory[kRegAddress]){
+          status |= 0b10;
+        }
+        if(  !((memory[kRegAddress] ^ memory[address])&0x80)  ){
+          // same sign, overflow possible
+          if( (memory[address]^static_cast<uint8_t>(temp))&0x80){
+            status |= 0b1;
+          }
+        }
         memory[kRegAddress] = static_cast<uint8_t>(temp);
+        memory[kOpRegStatusAddresses[static_cast<uint8_t>(reg)]] = status;
         break;
       case Operation::kLoad:
         memory[kRegAddress] = memory[address];
