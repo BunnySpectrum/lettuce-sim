@@ -158,7 +158,25 @@ struct OpBase{
 
  protected:
   ~OpBase() {}
+
+  static uint8_t locate_address(const uint8_t* memory, CodeAddressing addressMethod, uint8_t operand){
+    switch(addressMethod){
+      case CodeAddressing::kConstant:
+        return static_cast<uint8_t>(memory[kRegPC] + 1);
+      case CodeAddressing::kMemory:
+        return operand;
+      case CodeAddressing::kIndirect:
+        return memory[operand];
+      case CodeAddressing::kIndexed:
+        return memory[kRegX] + operand;
+      case CodeAddressing::kIndirectIndexed:
+        return memory[kRegX] + memory[memory[operand]];
+    } // zzz confirm compiler errors for unhandled case
+
+  }
 };
+
+
 
 struct OpAddSubLoadStore : OpBase{
   OpReg reg;
@@ -175,27 +193,9 @@ struct OpAddSubLoadStore : OpBase{
   }
 
   ModifiedMemory execute(uint8_t* memory){
-    uint8_t address;
-    switch(addressing){
-      case CodeAddressing::kConstant:
-        address = static_cast<uint8_t>(memory[kRegPC] + 1);
-        break;
-      case CodeAddressing::kMemory:
-        address = addrOrOperand;
-        break;
-      case CodeAddressing::kIndirect:
-        address = memory[addrOrOperand];
-        break;
-      case CodeAddressing::kIndexed:
-        address = memory[kRegX] + addrOrOperand;
-        break;
-      case CodeAddressing::kIndirectIndexed:
-        address = memory[kRegX] + memory[memory[addrOrOperand]];
-        break;
-    } // zzz confirm compiler errors for unhandled case
+    uint8_t address = locate_address(memory, addressing, addrOrOperand);
 
     // Address of the A, B, or X register
-    // zzz overflow/carry not implemented
     const uint8_t kRegAddress = kOpRegAddresses[static_cast<uint8_t>(reg)];
     uint16_t temp;
     uint8_t status = 0;
@@ -220,9 +220,9 @@ struct OpAddSubLoadStore : OpBase{
         if (static_cast<uint8_t>(temp) > memory[kRegAddress]){
           status |= 0b10;
         }
-        if(  !((memory[kRegAddress] ^ memory[address])&0x80)  ){
-          // same sign, overflow possible
-          if( (memory[address]^static_cast<uint8_t>(temp))&0x80){
+        if(  ((memory[kRegAddress] ^ memory[address])&0x80)  ){
+          // different sign, overflow possible
+          if( (memory[kRegAddress]^static_cast<uint8_t>(temp))&0x80){
             status |= 0b1;
           }
         }
@@ -260,8 +260,22 @@ struct OpOrAndLneg : OpBase{
   uint8_t operand;
 
   ModifiedMemory execute(uint8_t* memory){
+    uint8_t address = locate_address(memory, addressing, operand);
+    const uint8_t kRegAddress = kOpRegAddresses[static_cast<uint8_t>(KenbakReg::A)];
+    switch(operation){
+      case Operation::kAnd:
+        memory[kRegAddress] &= memory[address];
+        break;
+      case Operation::kOr:
+        memory[kRegAddress] |= memory[address];
+        break;
+      case Operation::kLoadNeg:
+        memory[kRegAddress] = static_cast<uint8_t>((memory[address]^0xFF) + 1);
+        break;
+    }
+
     memory[kRegPC] += 2;
-    return ModifiedMemory{0, 0};
+    return ModifiedMemory{0xFF, address};
   }
   
   size_t write(EeComposer composer){
@@ -287,8 +301,63 @@ struct OpJumps : OpBase{
   uint8_t operand;
 
   ModifiedMemory execute(uint8_t* memory){
-    memory[kRegPC] += 2;
-    return ModifiedMemory{0, 0};
+    CodeAddressing addressingMode;
+    switch(operation){
+      case Operation::kJumpMarkDirect:
+      case Operation::kJumpDirect:
+        addressingMode = CodeAddressing::kMemory;
+        break;
+      case Operation::kJumpMarkIndirect:
+      case Operation::kJumpIndirect:
+        addressingMode = CodeAddressing::kIndirect;
+        break;
+    }
+    const uint8_t address = locate_address(memory, addressingMode, operand);
+
+    bool conditionMet = false;
+    if(testSource == OpJumpTest::kUnconditional){
+      conditionMet = true;
+    }else{
+      // zzz this relies on the OpJumpTest values agreeing with OpReg
+      const uint8_t kRegAddress = kOpRegAddresses[static_cast<uint8_t>(testSource)];
+      const uint8_t kRegData = memory[kRegAddress];
+
+      switch(comparison){
+        case CodeComparison::kNotEqualZero:
+          conditionMet = kRegData != 0;
+          break;
+        case CodeComparison::kEqualZero:
+          conditionMet = kRegData == 0;
+          break;
+        case CodeComparison::kLessThanZero:
+          conditionMet = (kRegData & 0x80) == 0x80;
+          break;
+        case CodeComparison::kGreaterEqualZero:
+          conditionMet = (kRegData & 0x80) == 0;
+          break;
+        case CodeComparison::kGreaterZero:
+          conditionMet = ((kRegData & 0x80) == 0) && (kRegData > 0);
+          break;
+      }
+
+    }
+
+    if (conditionMet){
+      switch(operation){
+        case Operation::kJumpMarkDirect:
+        case Operation::kJumpMarkIndirect:
+          memory[address] = static_cast<uint8_t>(memory[kRegPC] + 2);
+          memory[kRegPC] = address+1;
+          break;
+        case Operation::kJumpDirect:
+        case Operation::kJumpIndirect:
+          memory[kRegPC] = address;
+          break;
+      }
+    }else{
+      memory[kRegPC] += 2;
+    }
+    return ModifiedMemory{0xFF, address};
   }
   
   size_t write(EeComposer composer){
@@ -327,8 +396,30 @@ struct OpBits : OpBase{
   uint8_t operand;
   
   ModifiedMemory execute(uint8_t* memory){
-    memory[kRegPC] += 2;
-    return ModifiedMemory{0, 0};
+    uint8_t newPC = memory[kRegPC] + 2;
+    uint8_t valueToTest;
+    switch(operation){
+      case Operation::kSkip0:
+        valueToTest = (memory[operand] & (1<<digit))>>digit;
+        if (valueToTest == 0){
+          newPC += 2;
+        }
+        break;
+      case Operation::kSkip1:
+        valueToTest = (memory[operand] & (1<<digit))>>digit;
+        if (valueToTest == 1){
+          newPC += 2;
+        }
+        break;
+      case Operation::kSet0:
+        memory[operand] &= ~(1<<digit);
+        break;
+      case Operation::kSet1:
+        memory[operand] |= 1<<digit;
+        break;
+    }
+    memory[kRegPC] = newPC;
+    return ModifiedMemory{0xFF, operand};
   }
 
   size_t write(EeComposer composer){
@@ -355,8 +446,24 @@ struct OpShiftRotate : OpBase{
   uint8_t places;
   
   ModifiedMemory execute(uint8_t* memory){
+    // zzz this relies on OpShiftReg to agree with OpReg
+    const uint8_t kRegAddress = kOpRegAddresses[static_cast<uint8_t>(reg)];
+    switch(operation){
+      case Operation::kLShift:
+        memory[kRegAddress] <<= places;
+        break;
+      case Operation::kRShift:
+        memory[kRegAddress] >>= places;
+        break;
+      case Operation::kLRotate:
+        memory[kRegAddress] = (memory[kRegAddress] << places) | (memory[kRegAddress]>>(8-places));
+        break;
+      case Operation::kRRotate:
+        memory[kRegAddress] = (memory[kRegAddress] >> places) | (memory[kRegAddress]<<(8-places));
+        break;
+    }
     memory[kRegPC] += 1;
-    return ModifiedMemory{0, 0};
+    return ModifiedMemory{0xFF, 0};
   }
 
   size_t write(EeComposer composer){
@@ -384,7 +491,7 @@ struct OpMisc : OpBase{
     if(operation == Operation::kNoop){
       memory[kRegPC] += 1;
     }
-    return ModifiedMemory{0, 0};
+    return ModifiedMemory{0x0, 0};
   }
   size_t write(EeComposer composer){
     size_t wrote = 0;

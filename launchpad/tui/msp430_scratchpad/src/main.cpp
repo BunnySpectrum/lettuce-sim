@@ -147,15 +147,15 @@ void task_cpu(const EeComposer& composer) {
 
     // Drawing only changes reduced example execution from 12s to 2s
     const auto bitmask = updateInfo.updateBitmask;
-    if (bitmask & 0b1 != 0){
+    if ((bitmask & 0b1) != 0){
       app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::A), cpuState.register_read(KenbakReg::A), _composer);
       app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::AOC), cpuState.register_read(KenbakReg::AOC), _composer);
     }
-    if (bitmask & 0b10 != 0){
+    if ((bitmask & 0b10) != 0){
       app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::B), cpuState.register_read(KenbakReg::B), _composer);
       app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::BOC), cpuState.register_read(KenbakReg::BOC), _composer);
     }
-    if (bitmask & 0b100 != 0){
+    if ((bitmask & 0b100) != 0){
       app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::X), cpuState.register_read(KenbakReg::X), _composer);
       app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::XOC), cpuState.register_read(KenbakReg::XOC), _composer);
     }
