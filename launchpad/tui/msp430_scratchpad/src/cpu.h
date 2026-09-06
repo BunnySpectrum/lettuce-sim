@@ -145,7 +145,7 @@ constexpr uint8_t kRegPC = 3;
 size_t write_operand(EeComposer composer, Operation operation, uint8_t operand, CodeAddressing addressing);
 
 struct ModifiedMemory {
- uint16_t updateBitmask;
+ uint8_t updateBitmask;
  uint8_t address; 
 };
 
@@ -238,7 +238,7 @@ struct OpAddSubLoadStore : OpBase{
     }
 
     memory[kRegPC] += 2;
-    return ModifiedMemory{0, 0};
+    return ModifiedMemory{0xFF, address};
   }
 
   size_t write(EeComposer composer){
@@ -618,15 +618,16 @@ class Kenbak {
   void move_cursor_address(int16_t amount) { cursorAddress_ += amount; }
   uint8_t memory_read(uint8_t address) const { return memory[address]; }
   uint8_t register_read(KenbakReg reg) const { return memory[static_cast<uint8_t>(reg)]; }
-  void execute() { 
+  ModifiedMemory execute() { 
     
     uint8_t instructionBuffer[sizeof(KenbakInstruction)] __attribute__((aligned(__alignof__(KenbakInstruction))));
 
     const uint8_t pcAddr = static_cast<uint8_t>(KenbakReg::PC); 
     OpBase* instruction = decode_instruction(memory[pcAddr], instructionBuffer);
 
-    instruction->execute(memory);
+    auto result = instruction->execute(memory);
     instruction->destroy();
+    return result;
   }
 
   void register_write(KenbakReg reg, uint8_t value) { memory[static_cast<uint8_t>(reg)] = value; }

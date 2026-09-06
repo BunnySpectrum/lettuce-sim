@@ -138,14 +138,34 @@ void setup() {
 void task_cpu(const EeComposer& composer) {
   if (cpuState.is_running() || stepCount > 0) {
     app.mem_view_cursor_clear(cpuState.register_read(KenbakReg::PC), _composer);
-    cpuState.execute();
+    auto updateInfo = cpuState.execute();
     if(stepCount > 0){
       stepCount--;
     }
-    // app.mem_view_update_addr(address, cpuState.memory_read(address), _composer);
     app.mem_view_cursor_set(cpuState.cursor_address(), _composer, kGlyphUser);
     app.mem_view_cursor_set(cpuState.register_read(KenbakReg::PC), _composer, kGlyphPC);
-    app.request_update_memory();
+
+    // Drawing only changes reduced example execution from 12s to 2s
+    const auto bitmask = updateInfo.updateBitmask;
+    if (bitmask & 0b1 != 0){
+      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::A), cpuState.register_read(KenbakReg::A), _composer);
+      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::AOC), cpuState.register_read(KenbakReg::AOC), _composer);
+    }
+    if (bitmask & 0b10 != 0){
+      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::B), cpuState.register_read(KenbakReg::B), _composer);
+      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::BOC), cpuState.register_read(KenbakReg::BOC), _composer);
+    }
+    if (bitmask & 0b100 != 0){
+      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::X), cpuState.register_read(KenbakReg::X), _composer);
+      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::XOC), cpuState.register_read(KenbakReg::XOC), _composer);
+    }
+    app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::PC), cpuState.register_read(KenbakReg::PC), _composer);
+    app.mem_view_update_addr(updateInfo.address, cpuState.memory_read(updateInfo.address), _composer);
+
+
+
+
+    // decode is cheap enough to redraw each time (for now)
     app.request_update_decode();
   }
 }
@@ -158,6 +178,9 @@ void loop() {
   if (console_uart.Available()) {
     last_input = console_uart.ReadByte();
     switch (last_input) {
+      case 'c':
+        _composer.ClearScreen();
+        break;
       case 'r':
         _composer.ClearScreen();
         app.mem_view_cursor_set(cpuState.cursor_address(), _composer, kGlyphUser);
@@ -169,6 +192,7 @@ void loop() {
         break;
       case 'n':
         stepCount = 1;
+        task_cpu(_composer);
         break;
       case 's':
         // case 'j':
