@@ -86,6 +86,8 @@ int ReadCommand(uint8_t* character) {
 Kenbak cpuState;
 uint8_t activeImage = 0;
 uint8_t stepCount = 0;
+const char kGlyphUser = '>';
+const char kGlyphPC = ';';
 
 // How many ticks (today, 1tick = 1ms) until we run
 //  >1 = decrement each tick
@@ -129,16 +131,20 @@ void setup() {
   _composer.ShowCursor(false);
 
   room_setup.update_post();
-  app.mem_view_cursor_set(cpuState.cursor_address(), _composer);
+  app.mem_view_cursor_set(cpuState.cursor_address(), _composer, kGlyphUser);
+  app.mem_view_cursor_set(cpuState.register_read(KenbakReg::PC), _composer, kGlyphPC);
 }
 
 void task_cpu(const EeComposer& composer) {
   if (cpuState.is_running() || stepCount > 0) {
+    app.mem_view_cursor_clear(cpuState.register_read(KenbakReg::PC), _composer);
     cpuState.execute();
     if(stepCount > 0){
       stepCount--;
     }
     // app.mem_view_update_addr(address, cpuState.memory_read(address), _composer);
+    app.mem_view_cursor_set(cpuState.cursor_address(), _composer, kGlyphUser);
+    app.mem_view_cursor_set(cpuState.register_read(KenbakReg::PC), _composer, kGlyphPC);
     app.request_update_memory();
     app.request_update_decode();
   }
@@ -154,7 +160,8 @@ void loop() {
     switch (last_input) {
       case 'r':
         _composer.ClearScreen();
-        app.mem_view_cursor_set(cpuState.cursor_address(), _composer);
+        app.mem_view_cursor_set(cpuState.cursor_address(), _composer, kGlyphUser);
+        app.mem_view_cursor_set(cpuState.register_read(KenbakReg::PC), _composer, kGlyphPC);
         app.request_update_all();
         break;
       case 'g':
@@ -167,28 +174,32 @@ void loop() {
         // case 'j':
         app.mem_view_cursor_clear(cpuState.cursor_address(), _composer);
         cpuState.move_cursor_address(16);
-        app.mem_view_cursor_set(cpuState.cursor_address(), _composer);
+        app.mem_view_cursor_set(cpuState.cursor_address(), _composer, kGlyphUser);
+        app.mem_view_cursor_set(cpuState.register_read(KenbakReg::PC), _composer, kGlyphPC);
         app.request_update_decode();
         break;
       case 'w':
         // case 'k':
         app.mem_view_cursor_clear(cpuState.cursor_address(), _composer);
         cpuState.move_cursor_address(-16);
-        app.mem_view_cursor_set(cpuState.cursor_address(), _composer);
+        app.mem_view_cursor_set(cpuState.cursor_address(), _composer, kGlyphUser);
+        app.mem_view_cursor_set(cpuState.register_read(KenbakReg::PC), _composer, kGlyphPC);
         app.request_update_decode();
         break;
       case 'a':
         // case 'h':
         app.mem_view_cursor_clear(cpuState.cursor_address(), _composer);
         cpuState.move_cursor_address(-1);
-        app.mem_view_cursor_set(cpuState.cursor_address(), _composer);
+        app.mem_view_cursor_set(cpuState.cursor_address(), _composer, kGlyphUser);
+        app.mem_view_cursor_set(cpuState.register_read(KenbakReg::PC), _composer, kGlyphPC);
         app.request_update_decode();
         break;
       case 'd':
         // case 'l':
         app.mem_view_cursor_clear(cpuState.cursor_address(), _composer);
         cpuState.move_cursor_address(1);
-        app.mem_view_cursor_set(cpuState.cursor_address(), _composer);
+        app.mem_view_cursor_set(cpuState.cursor_address(), _composer, kGlyphUser);
+        app.mem_view_cursor_set(cpuState.register_read(KenbakReg::PC), _composer, kGlyphPC);
         app.request_update_decode();
         break;
       case '1':
@@ -196,7 +207,10 @@ void loop() {
         break;
       case 'm':
         activeImage ^= 1;
+        app.mem_view_cursor_clear(cpuState.register_read(KenbakReg::PC), _composer);
         cpuState.load_image(activeImage);
+        app.mem_view_cursor_set(cpuState.cursor_address(), _composer, kGlyphUser);
+        app.mem_view_cursor_set(cpuState.register_read(KenbakReg::PC), _composer, kGlyphPC);
         app.request_update_all();
         break;
       default:

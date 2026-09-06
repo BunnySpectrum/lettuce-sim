@@ -193,12 +193,12 @@ void App::mem_view_update_addr(uint8_t addr, uint8_t data, const EeComposer& com
 }
 
 // void App::mem_view_cursor_set(uint8_t addr) {
-void App::mem_view_cursor_set(uint8_t addr, const EeComposer& composer_) {
+void App::mem_view_cursor_set(uint8_t addr, const EeComposer& composer_, char glyph) {
 //   composer_.MoveTo(kAppMemView.origin);
   composer_.MoveTo(kNePoint.row, kNePoint.col);
   composer_.MoveDown(addr / 16 + 1);
   composer_.MoveRight(4 + 4 * (addr & 0xF));
-  composer_.stream_->WriteChar('>');
+  composer_.stream_->WriteChar(glyph);
 }
 void App::mem_view_cursor_clear(uint8_t addr, const EeComposer& composer_) {
 //   composer_.MoveTo(kAppMemView.origin);
