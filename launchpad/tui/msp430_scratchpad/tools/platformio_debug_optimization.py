@@ -1,4 +1,4 @@
-"""Apply -O0 only to application-owned code in the debug-full build."""
+"""Keep main.cpp at -O0 in debug-full; leave all other code at -Os."""
 
 import os
 
@@ -6,10 +6,7 @@ Import("env")
 
 
 PROJECT_DIR = os.path.realpath(env.subst("$PROJECT_DIR"))
-UNOPTIMIZED_ROOTS = tuple(
-    os.path.realpath(os.path.join(PROJECT_DIR, path))
-    for path in ("src", "lib/tui", "lib/byte_stream")
-)
+UNOPTIMIZED_SOURCE = os.path.realpath(os.path.join(PROJECT_DIR, "src/main.cpp"))
 OPTIMIZATION_FLAGS = {
     "-O0",
     "-O1",
@@ -21,16 +18,9 @@ OPTIMIZATION_FLAGS = {
 }
 
 
-def is_below(path, root):
-    try:
-        return os.path.commonpath((path, root)) == root
-    except ValueError:
-        return False
-
-
-def use_unoptimized_debug_code(build_env, node):
+def use_unoptimized_main(build_env, node):
     source_path = os.path.realpath(node.srcnode().get_abspath())
-    if not any(is_below(source_path, root) for root in UNOPTIMIZED_ROOTS):
+    if source_path != UNOPTIMIZED_SOURCE:
         return node
 
     flags = [
@@ -41,4 +31,4 @@ def use_unoptimized_debug_code(build_env, node):
     return build_env.Object(node, CCFLAGS=flags + ["-O0"])
 
 
-env.AddBuildMiddleware(use_unoptimized_debug_code)
+env.AddBuildMiddleware(use_unoptimized_main)
