@@ -1,3 +1,4 @@
+#include "app.h"
 #include "arduino/byte_stream_arduino.h"
 #include "cmd_processor.h"
 #include "cpu.h"
@@ -7,8 +8,8 @@
 #include "ee_text.h"
 #include "locale.h"
 #include "stack.h"
+#include "ui.h"
 #include "view.h"
-#include "app.h"
 
 #include <Arduino.h>
 #undef OUTPUT
@@ -61,8 +62,6 @@ constexpr uint8_t kLeftMargin = 1;
 constexpr EePoint kDebugPoint = {kScreenWidth + 10, 1 /* row */};
 constexpr EePoint kInputPoint = {kLeftMargin + 2, kDebugPoint.row};
 
-
-
 /* end */
 
 /* Input */
@@ -88,6 +87,7 @@ uint8_t activeImage = 0;
 uint8_t stepCount = 0;
 const char kGlyphUser = '>';
 const char kGlyphPC = ';';
+KenbakUserInterface userInterface(P2_5, P2_4, P2_3);
 
 // How many ticks (today, 1tick = 1ms) until we run
 //  >1 = decrement each tick
@@ -95,9 +95,10 @@ const char kGlyphPC = ';';
 //  0 = do not update counter each tick
 #define CPU_TASK_PERIOD 200
 uint8_t cpu_task_counter;
+
+#define BUTTONS_TASK_PERIOD 201
+uint8_t buttons_task_counter;
 /* end */
-
-
 
 void ComposeSheet(const EeComposer& composer) {
   uint16_t start = millis();
@@ -121,9 +122,22 @@ void setup() {
 
   cpu_task_counter = CPU_TASK_PERIOD;
   debug_task_counter = DEBUG_TASK_PERIOD;
+  buttons_task_counter = BUTTONS_TASK_PERIOD;
 
   pinMode(RED_LED, 1);
   pinMode(GREEN_LED, 1);
+  userInterface.setup();
+  bool done = false;
+  do {
+    done = userInterface.counting();
+    delay(200);
+  } while (!done);
+
+  done = false;
+  do {
+    done = userInterface.scroll();
+    delay(200);
+  } while (!done);
 
   input_text.SetText("");
 
@@ -139,7 +153,7 @@ void task_cpu(const EeComposer& composer) {
   if (cpuState.is_running() || stepCount > 0) {
     app.mem_view_cursor_clear(cpuState.register_read(KenbakReg::PC), _composer);
     auto updateInfo = cpuState.execute();
-    if(stepCount > 0){
+    if (stepCount > 0) {
       stepCount--;
     }
     app.mem_view_cursor_set(cpuState.cursor_address(), _composer, kGlyphUser);
@@ -147,23 +161,28 @@ void task_cpu(const EeComposer& composer) {
 
     // Drawing only changes reduced example execution from 12s to 2s
     const auto bitmask = updateInfo.updateBitmask;
-    if ((bitmask & 0b1) != 0){
-      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::A), cpuState.register_read(KenbakReg::A), _composer);
-      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::AOC), cpuState.register_read(KenbakReg::AOC), _composer);
+    if ((bitmask & 0b1) != 0) {
+      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::A),
+                               cpuState.register_read(KenbakReg::A), _composer);
+      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::AOC),
+                               cpuState.register_read(KenbakReg::AOC), _composer);
     }
-    if ((bitmask & 0b10) != 0){
-      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::B), cpuState.register_read(KenbakReg::B), _composer);
-      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::BOC), cpuState.register_read(KenbakReg::BOC), _composer);
+    if ((bitmask & 0b10) != 0) {
+      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::B),
+                               cpuState.register_read(KenbakReg::B), _composer);
+      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::BOC),
+                               cpuState.register_read(KenbakReg::BOC), _composer);
     }
-    if ((bitmask & 0b100) != 0){
-      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::X), cpuState.register_read(KenbakReg::X), _composer);
-      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::XOC), cpuState.register_read(KenbakReg::XOC), _composer);
+    if ((bitmask & 0b100) != 0) {
+      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::X),
+                               cpuState.register_read(KenbakReg::X), _composer);
+      app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::XOC),
+                               cpuState.register_read(KenbakReg::XOC), _composer);
     }
-    app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::PC), cpuState.register_read(KenbakReg::PC), _composer);
-    app.mem_view_update_addr(updateInfo.address, cpuState.memory_read(updateInfo.address), _composer);
-
-
-
+    app.mem_view_update_addr(static_cast<uint8_t>(KenbakReg::PC),
+                             cpuState.register_read(KenbakReg::PC), _composer);
+    app.mem_view_update_addr(updateInfo.address, cpuState.memory_read(updateInfo.address),
+                             _composer);
 
     // decode is cheap enough to redraw each time (for now)
     app.request_update_decode();
@@ -180,6 +199,7 @@ void loop() {
     switch (last_input) {
       case 'c':
         _composer.ClearScreen();
+        userInterface.setup();
         break;
       case 'r':
         _composer.ClearScreen();
@@ -247,6 +267,10 @@ void loop() {
     task_cpu(_composer);
     room_hbt.update_post();
     cpu_task_counter = CPU_TASK_PERIOD;
+  }
+  if (buttons_task_counter-- == 1) {
+    userInterface.buttons();
+    buttons_task_counter = BUTTONS_TASK_PERIOD;
   }
 
   if (app.needs_redraw()) {
